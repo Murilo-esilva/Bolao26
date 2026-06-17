@@ -1,5 +1,5 @@
 console.log("APP CARREGOU");
-console.log(matches.length);
+
 const matches = [
   {
     "id": 537397,
@@ -328,7 +328,7 @@ const matches = [
 ];
 
 const container = document.getElementById("games-container");
-
+console.log(matches.length);
 renderGames();
 
 function renderGames() {
