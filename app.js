@@ -1,3 +1,5 @@
+console.log("APP CARREGOU");
+console.log(matches.length);
 const matches = [
   {
     "id": 537397,
