@@ -237,6 +237,7 @@ async function authenticateGroup() {
                 if (state.unsubscribeAllPredictions) state.unsubscribeAllPredictions();
                 return;
             }
+            
         } else {
             // Grupo não existe, cria com a senha
             await setDoc(groupRef, {
