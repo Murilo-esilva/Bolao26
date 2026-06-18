@@ -430,6 +430,15 @@ h2 {
     transform: translateX(120%) skewX(-20deg);
 }
 
+.save-button:disabled {
+    cursor: wait;
+    opacity: 0.68;
+}
+
+.save-button:disabled::after {
+    display: none;
+}
+
 .save-button.compact {
     margin-top: 0.85rem;
 }
