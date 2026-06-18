@@ -594,16 +594,29 @@ async function syncOfficialResults() {
 
     adminButton.disabled = true;
     syncMessage.style.color = "var(--text-muted, #666)";
-    syncMessage.textContent = "⏳ Conectando à API da FIFA e buscando placares...";
+    syncMessage.textContent = "⏳ Conectando à API de forma segura e buscando placares...";
 
     const API_TOKEN = "SEU_TOKEN_AQUI"; 
     
     try {
-        const response = await fetch("https://football-data.org", {
-            headers: { "X-Auth-Token": 8c1fd129b7b4474694b6b29c8ea69aad }
+        // CORREÇÃO: Usando um redirecionador CORS para evitar que o navegador bloqueie o SSL inválido
+        const urlOriginal = "https://football-data.org";
+        const urlComProxy = "https://herokuapp.com" + urlOriginal;
+
+        const response = await fetch(urlComProxy, {
+            headers: { 
+                "X-Auth-Token": API_TOKEN,
+                "Content-Type": "application/json"
+            }
         });
 
-        if (!response.ok) throw new Error(`Status ${response.status}`);
+        if (!response.ok) {
+            // Se o proxy público pedir ativação temporária, avisa o admin
+            if (response.status === 403) {
+                throw new Error("CORS temporariamente bloqueado. Ative o proxy em: https://herokuapp.comcorsdemo");
+            }
+            throw new Error(`Status ${response.status}`);
+        }
 
         const data = await response.json();
         const batch = writeBatch(state.db);
