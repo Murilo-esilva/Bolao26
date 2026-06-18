@@ -581,7 +581,6 @@ async function saveResult(match) {
 // 1. Lembre-se de mapear o novo elemento de mensagem no objeto 'els' no topo do seu app.js:
 // els.syncMessage = document.getElementById("syncMessage");
 // els.btnSyncApi = document.getElementById("btnSyncApi");
-
 async function syncOfficialResults() {
     const adminButton = els.btnSyncApi;
     const syncMessage = els.syncMessage;
@@ -594,31 +593,29 @@ async function syncOfficialResults() {
 
     adminButton.disabled = true;
     syncMessage.style.color = "var(--text-muted, #666)";
-    syncMessage.textContent = "⏳ Conectando à API de forma segura e buscando placares...";
+    syncMessage.textContent = "⏳ n8n processando e sincronizando dados da FIFA...";
 
-    const API_TOKEN = "SEU_TOKEN_AQUI"; 
+    // 🔴 SUBSTITUA PELA URL DE PRODUÇÃO DO SEU WEBHOOK DO N8N
+    const N8N_WEBHOOK_URL = "https://n8n-homol.unicoob.local/webhook/sincronizar-copa"; 
     
     try {
-        // CORREÇÃO: Usando um redirecionador CORS para evitar que o navegador bloqueie o SSL inválido
-        const urlOriginal = "https://football-data.org";
-        const urlComProxy = "https://herokuapp.com" + urlOriginal;
-
-        const response = await fetch(urlComProxy, {
-            headers: { 
-                "X-Auth-Token": API_TOKEN,
-                "Content-Type": "application/json"
-            }
+        // Dispara a automação no seu servidor n8n
+        const response = await fetch(N8N_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
         });
 
         if (!response.ok) {
-            // Se o proxy público pedir ativação temporária, avisa o admin
-            if (response.status === 403) {
-                throw new Error("CORS temporariamente bloqueado. Ative o proxy em: https://herokuapp.comcorsdemo");
-            }
-            throw new Error(`Status ${response.status}`);
+            throw new Error(`Erro no servidor n8n: Status ${response.status}`);
         }
 
         const data = await response.json();
+        
+        // Garante que o n8n respondeu com a estrutura de partidas esperada
+        if (!data || !data.matches) {
+            throw new Error("O servidor n8n não retornou a estrutura de dados correta.");
+        }
+
         const batch = writeBatch(state.db);
         let countUpdates = 0;
         const localMatchIds = new Set(matches.map(m => Number(m.id)));
@@ -626,6 +623,7 @@ async function syncOfficialResults() {
         data.matches.forEach((apiMatch) => {
             const matchId = Number(apiMatch.id);
 
+            // Filtra os jogos locais do bolão que já terminaram de fato
             if (localMatchIds.has(matchId) && apiMatch.status === "FINISHED") {
                 const homeGoals = apiMatch.score.fullTime.home;
                 const awayGoals = apiMatch.score.fullTime.away;
@@ -647,16 +645,16 @@ async function syncOfficialResults() {
             await batch.commit();
             await recalculateRanking(); 
             syncMessage.style.color = "green";
-            syncMessage.textContent = `✅ Sucesso! ${countUpdates} jogos atualizados e ranking recalculado!`;
+            syncMessage.textContent = `✅ Sucesso! ${countUpdates} jogos integrados via n8n e ranking atualizado!`;
         } else {
             syncMessage.style.color = "orange";
-            syncMessage.textContent = "🎉 Nenhum resultado novo encontrado na API.";
+            syncMessage.textContent = "🎉 O n8n checou, mas não há novos resultados encerrados na API.";
         }
 
     } catch (error) {
         console.error(error);
         syncMessage.style.color = "red";
-        syncMessage.textContent = `❌ Falha na sincronização: ${error.message}`;
+        syncMessage.textContent = `❌ Falha na automação: ${error.message}`;
     } finally {
         adminButton.disabled = false;
     }
