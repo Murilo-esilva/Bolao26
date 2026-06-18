@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/fireba
 import {
     collection,
     doc,
+    getDoc,
     getFirestore,
     getDocs,
     onSnapshot,
@@ -347,149 +348,81 @@ const matches = [
     "homeTeam": "Cape Verde Islands",
     "awayTeam": "Saudi Arabia"
   }
-
-  
 ];
+
+// ─── Estado global ───────────────────────────────────────────────────────────
 
 const state = {
     db: null,
+    // grupo selecionado
+    groupId: null,
+    groupName: null,
+    // participante atual
     participantId: "",
     participantName: "",
+    // listeners ativos (para cancelar ao trocar de grupo)
     unsubscribePredictions: null,
     unsubscribeAllPredictions: null,
     unsubscribeRanking: null,
     unsubscribeParticipants: null,
     unsubscribeResults: null,
+    // dados em memória
     participants: [],
     predictions: [],
     results: new Map()
 };
 
-const flags = {
-    "Algeria": "🇩🇿",
-    "Argentina": "🇦🇷",
-    "Australia": "🇦🇺",
-    "Austria": "🇦🇹",
-    "Belgium": "🇧🇪",
-    "Bosnia-Herzegovina": "🇧🇦",
-    "Brazil": "🇧🇷",
-    "Canada": "🇨🇦",
-    "Cape Verde Islands": "🇨🇻",
-    "Colombia": "🇨🇴",
-    "Congo DR": "🇨🇩",
-    "Croatia": "🇭🇷",
-    "Curaçao": "🇨🇼",
-    "Czechia": "🇨🇿",
-    "Ecuador": "🇪🇨",
-    "Egypt": "🇪🇬",
-    "England": "🏴",
-    "France": "🇫🇷",
-    "Germany": "🇩🇪",
-    "Ghana": "🇬🇭",
-    "Haiti": "🇭🇹",
-    "Iran": "🇮🇷",
-    "Iraq": "🇮🇶",
-    "Ivory Coast": "🇨🇮",
-    "Japan": "🇯🇵",
-    "Jordan": "🇯🇴",
-    "Mexico": "🇲🇽",
-    "Morocco": "🇲🇦",
-    "Netherlands": "🇳🇱",
-    "New Zealand": "🇳🇿",
-    "Norway": "🇳🇴",
-    "Panama": "🇵🇦",
-    "Paraguay": "🇵🇾",
-    "Portugal": "🇵🇹",
-    "Qatar": "🇶🇦",
-    "Saudi Arabia": "🇸🇦",
-    "Scotland": "🏴",
-    "Senegal": "🇸🇳",
-    "South Africa": "🇿🇦",
-    "South Korea": "🇰🇷",
-    "Spain": "🇪🇸",
-    "Sweden": "🇸🇪",
-    "Switzerland": "🇨🇭",
-    "Tunisia": "🇹🇳",
-    "Turkey": "🇹🇷",
-    "United States": "🇺🇸",
-    "Uruguay": "🇺🇾",
-    "Uzbekistan": "🇺🇿"
-};
+// ─── Bandeiras ────────────────────────────────────────────────────────────────
 
 const flagCodes = {
-    "Algeria": "dz",
-    "Argentina": "ar",
-    "Australia": "au",
-    "Austria": "at",
-    "Belgium": "be",
-    "Bosnia-Herzegovina": "ba",
-    "Brazil": "br",
-    "Canada": "ca",
-    "Cape Verde Islands": "cv",
-    "Colombia": "co",
-    "Congo DR": "cd",
-    "Croatia": "hr",
-    "Curaçao": "cw",
-    "Czechia": "cz",
-    "Ecuador": "ec",
-    "Egypt": "eg",
-    "England": "gb-eng",
-    "France": "fr",
-    "Germany": "de",
-    "Ghana": "gh",
-    "Haiti": "ht",
-    "Iran": "ir",
-    "Iraq": "iq",
-    "Ivory Coast": "ci",
-    "Japan": "jp",
-    "Jordan": "jo",
-    "Mexico": "mx",
-    "Morocco": "ma",
-    "Netherlands": "nl",
-    "New Zealand": "nz",
-    "Norway": "no",
-    "Panama": "pa",
-    "Paraguay": "py",
-    "Portugal": "pt",
-    "Qatar": "qa",
-    "Saudi Arabia": "sa",
-    "Scotland": "gb-sct",
-    "Senegal": "sn",
-    "South Africa": "za",
-    "South Korea": "kr",
-    "Spain": "es",
-    "Sweden": "se",
-    "Switzerland": "ch",
-    "Tunisia": "tn",
-    "Turkey": "tr",
-    "United States": "us",
-    "Uruguay": "uy",
-    "Uzbekistan": "uz"
+    "Algeria": "dz", "Argentina": "ar", "Australia": "au", "Austria": "at",
+    "Belgium": "be", "Bosnia-Herzegovina": "ba", "Brazil": "br", "Canada": "ca",
+    "Cape Verde Islands": "cv", "Colombia": "co", "Congo DR": "cd", "Croatia": "hr",
+    "Curaçao": "cw", "Czechia": "cz", "Ecuador": "ec", "Egypt": "eg",
+    "England": "gb-eng", "France": "fr", "Germany": "de", "Ghana": "gh",
+    "Haiti": "ht", "Iran": "ir", "Iraq": "iq", "Ivory Coast": "ci",
+    "Japan": "jp", "Jordan": "jo", "Mexico": "mx", "Morocco": "ma",
+    "Netherlands": "nl", "New Zealand": "nz", "Norway": "no", "Panama": "pa",
+    "Paraguay": "py", "Portugal": "pt", "Qatar": "qa", "Saudi Arabia": "sa",
+    "Scotland": "gb-sct", "Senegal": "sn", "South Africa": "za", "South Korea": "kr",
+    "Spain": "es", "Sweden": "se", "Switzerland": "ch", "Tunisia": "tn",
+    "Turkey": "tr", "United States": "us", "Uruguay": "uy", "Uzbekistan": "uz"
 };
 
+// ─── Referências a elementos do DOM ──────────────────────────────────────────
+
 const els = {
-    adminDialog: document.getElementById("adminDialog"),
-    adminLogin: document.getElementById("adminLogin"),
-    adminMessage: document.getElementById("adminMessage"),
-    adminOpen: document.getElementById("adminOpen"),
-    adminPanel: document.getElementById("adminPanel"),
-    adminPassword: document.getElementById("adminPassword"),
-    adminResults: document.getElementById("adminResults"),
-    adminUnlock: document.getElementById("adminUnlock"),
-    bolaoForm: document.getElementById("bolaoForm"),
-    connectionStatus: document.getElementById("connectionStatus"),
-    gamesContainer: document.getElementById("games-container"),
-    loadingOverlay: document.getElementById("loadingOverlay"),
-    participantName: document.getElementById("participantName"),
-    rankingBody: document.getElementById("rankingBody"),
+    adminDialog:        document.getElementById("adminDialog"),
+    adminLogin:         document.getElementById("adminLogin"),
+    adminMessage:       document.getElementById("adminMessage"),
+    adminOpen:          document.getElementById("adminOpen"),
+    adminPanel:         document.getElementById("adminPanel"),
+    adminPassword:      document.getElementById("adminPassword"),
+    adminResults:       document.getElementById("adminResults"),
+    adminUnlock:        document.getElementById("adminUnlock"),
+    activeGroupName:    document.getElementById("activeGroupName"),
+    bolaoForm:          document.getElementById("bolaoForm"),
+    changeGroupBtn:     document.getElementById("changeGroupBtn"),
+    connectionStatus:   document.getElementById("connectionStatus"),
+    gamesContainer:     document.getElementById("games-container"),
+    groupDialog:        document.getElementById("groupDialog"),
+    groupList:          document.getElementById("groupList"),
+    newGroupName:       document.getElementById("newGroupName"),
+    createGroupBtn:     document.getElementById("createGroupBtn"),
+    groupCreateMessage: document.getElementById("groupCreateMessage"),
+    loadingOverlay:     document.getElementById("loadingOverlay"),
+    participantName:    document.getElementById("participantName"),
+    rankingBody:        document.getElementById("rankingBody"),
     recalculateRanking: document.getElementById("recalculateRanking"),
-    resultsBoard: document.getElementById("resultsBoard"),
-    resultsCount: document.getElementById("resultsCount"),
-    savedPredictions: document.getElementById("savedPredictions"),
-    totalGames: document.getElementById("totalGames"),
-    totalParticipants: document.getElementById("totalParticipants"),
-    totalResults: document.getElementById("totalResults")
+    resultsBoard:       document.getElementById("resultsBoard"),
+    resultsCount:       document.getElementById("resultsCount"),
+    savedPredictions:   document.getElementById("savedPredictions"),
+    totalGames:         document.getElementById("totalGames"),
+    totalParticipants:  document.getElementById("totalParticipants"),
+    totalResults:       document.getElementById("totalResults")
 };
+
+// ─── Inicialização ────────────────────────────────────────────────────────────
 
 start();
 
@@ -502,6 +435,7 @@ function start() {
     if (!isFirebaseConfigured(firebaseConfig)) {
         setConnection("Configure o Firebase");
         hideLoading();
+        openGroupDialog();
         return;
     }
 
@@ -509,17 +443,168 @@ function start() {
         const app = initializeApp(firebaseConfig);
         state.db = getFirestore(app);
         setConnection("Firestore conectado");
-        listenToRanking();
-        listenToParticipants();
-        listenToAllPredictions();
-        listenToResults();
     } catch (error) {
         console.error(error);
         setConnection("Erro no Firebase");
     } finally {
         hideLoading();
     }
+
+    openGroupDialog();
 }
+
+// ─── Helpers de caminho Firestore ─────────────────────────────────────────────
+// Toda coleção fica dentro de grupos/{groupId}/<subcollection>
+
+function groupCol(subcollection) {
+    return collection(state.db, "grupos", state.groupId, subcollection);
+}
+
+function groupDoc(subcollection, docId) {
+    return doc(state.db, "grupos", state.groupId, subcollection, docId);
+}
+
+// ─── Modal de grupos ──────────────────────────────────────────────────────────
+
+function openGroupDialog() {
+    els.groupDialog.showModal();
+    loadGroupList();
+}
+
+async function loadGroupList() {
+    if (!state.db) {
+        els.groupList.innerHTML = `<div class="group-list-empty">Firebase não configurado.</div>`;
+        return;
+    }
+
+    els.groupList.innerHTML = `<div class="group-list-empty">Carregando grupos...</div>`;
+
+    try {
+        const snap = await getDocs(collection(state.db, "grupos"));
+
+        if (snap.empty) {
+            els.groupList.innerHTML = `<div class="group-list-empty">Nenhum grupo criado ainda. Crie o primeiro!</div>`;
+            return;
+        }
+
+        els.groupList.innerHTML = "";
+
+        snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => String(a.nome).localeCompare(String(b.nome)))
+            .forEach(group => {
+                const btn = document.createElement("button");
+                btn.className = "group-item";
+                btn.type = "button";
+                btn.innerHTML = `
+                    <span class="group-item-icon">${escapeHtml(group.nome.charAt(0).toUpperCase())}</span>
+                    <span class="group-item-name">${escapeHtml(group.nome)}</span>
+                    <span class="group-item-arrow">→</span>
+                `;
+                btn.addEventListener("click", () => enterGroup(group.id, group.nome));
+                els.groupList.appendChild(btn);
+            });
+    } catch (error) {
+        els.groupList.innerHTML = `<div class="group-list-empty">Erro ao carregar grupos.</div>`;
+        console.error(error);
+    }
+}
+
+async function createGroup() {
+    const name = els.newGroupName.value.trim();
+
+    if (!name) {
+        els.groupCreateMessage.textContent = "Digite um nome para o grupo.";
+        return;
+    }
+
+    if (!state.db) {
+        els.groupCreateMessage.textContent = "Firebase não configurado.";
+        return;
+    }
+
+    const groupId = normalizeId(name);
+    els.createGroupBtn.disabled = true;
+    els.groupCreateMessage.textContent = "";
+
+    try {
+        // Verifica se o grupo já existe
+        const existing = await getDoc(doc(state.db, "grupos", groupId));
+
+        if (existing.exists()) {
+            // Grupo já existe — entra nele diretamente
+            enterGroup(groupId, existing.data().nome);
+            return;
+        }
+
+        // Cria o documento do grupo
+        await setDoc(doc(state.db, "grupos", groupId), {
+            nome: name,
+            criadoEm: serverTimestamp()
+        });
+
+        els.newGroupName.value = "";
+        enterGroup(groupId, name);
+    } catch (error) {
+        els.groupCreateMessage.textContent = "Erro ao criar grupo. Tente novamente.";
+        console.error(error);
+    } finally {
+        els.createGroupBtn.disabled = false;
+    }
+}
+
+function enterGroup(groupId, groupName) {
+    // Cancela todos os listeners do grupo anterior
+    unsubscribeAll();
+
+    state.groupId = groupId;
+    state.groupName = groupName;
+
+    // Limpa estado de participante ao trocar de grupo
+    state.participantId = "";
+    state.participantName = "";
+    els.participantName.value = "";
+    showPreviewMessage("Nenhum palpite salvo nesta sessão.");
+
+    // Atualiza UI
+    els.activeGroupName.textContent = groupName;
+    els.groupDialog.close();
+
+    // Inicia listeners do novo grupo
+    if (state.db) {
+        listenToRanking();
+        listenToParticipants();
+        listenToAllPredictions();
+        listenToResults();
+        setConnection(`Grupo: ${groupName}`);
+    }
+}
+
+function unsubscribeAll() {
+    state.unsubscribePredictions?.();
+    state.unsubscribeAllPredictions?.();
+    state.unsubscribeRanking?.();
+    state.unsubscribeParticipants?.();
+    state.unsubscribeResults?.();
+
+    state.unsubscribePredictions = null;
+    state.unsubscribeAllPredictions = null;
+    state.unsubscribeRanking = null;
+    state.unsubscribeParticipants = null;
+    state.unsubscribeResults = null;
+
+    // Limpa os dados em memória ao trocar de grupo
+    state.participants = [];
+    state.predictions = [];
+    state.results = new Map();
+    els.totalParticipants.textContent = "0";
+    els.totalResults.textContent = "0";
+    els.resultsCount.textContent = "0 palpites";
+    els.rankingBody.innerHTML = `<tr><td colspan="5" class="empty-state">Aguardando ranking.</td></tr>`;
+    els.resultsBoard.innerHTML = `<div class="empty-results">Aguardando dados do Firestore.</div>`;
+}
+
+// ─── Eventos ──────────────────────────────────────────────────────────────────
 
 function bindEvents() {
     document.querySelectorAll(".tab-button").forEach((button) => {
@@ -527,22 +612,31 @@ function bindEvents() {
     });
 
     els.participantName.addEventListener("change", () => handleParticipantName().catch(handleFirebaseError));
-    els.participantName.addEventListener("blur", () => handleParticipantName().catch(handleFirebaseError));
+    els.participantName.addEventListener("blur",   () => handleParticipantName().catch(handleFirebaseError));
     els.bolaoForm.addEventListener("submit", savePredictions);
     els.adminOpen.addEventListener("click", () => els.adminDialog.showModal());
     els.adminUnlock.addEventListener("click", unlockAdmin);
     els.recalculateRanking.addEventListener("click", () => recalculateRanking().catch(handleFirebaseError));
+    els.changeGroupBtn.addEventListener("click", () => {
+        loadGroupList();
+        els.groupDialog.showModal();
+    });
+    els.createGroupBtn.addEventListener("click", () => createGroup().catch(handleFirebaseError));
+    els.newGroupName.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") createGroup().catch(handleFirebaseError);
+    });
 }
 
 function activateTab(tab) {
     document.querySelectorAll(".tab-button").forEach((button) => {
         button.classList.toggle("active", button.dataset.tab === tab);
     });
-
     document.querySelectorAll(".tab-panel").forEach((panel) => {
         panel.classList.toggle("active", panel.dataset.panel === tab);
     });
 }
+
+// ─── Render de jogos (formulário de palpites) ─────────────────────────────────
 
 function renderGames() {
     let currentDay = "";
@@ -616,15 +710,17 @@ function renderAdminResults() {
     els.adminResults.replaceChildren(fragment);
 }
 
+// ─── Participante ─────────────────────────────────────────────────────────────
+
 async function handleParticipantName() {
     const name = els.participantName.value.trim();
 
-    if (!name || !state.db) return;
+    if (!name || !state.db || !state.groupId) return;
 
     state.participantName = name;
-    state.participantId = normalizeId(name);
+    state.participantId   = normalizeId(name);
 
-    await setDoc(doc(collection(state.db, "participantes"), state.participantId), {
+    await setDoc(groupDoc("participantes", state.participantId), {
         nome: name,
         criadoEm: serverTimestamp()
     }, { merge: true });
@@ -633,15 +729,15 @@ async function handleParticipantName() {
     setConnection("Participante ativo");
 }
 
-function listenToCurrentPredictions() {
-    if (!state.db || !state.participantId) return;
+// ─── Listeners Firestore (escopo de grupo) ────────────────────────────────────
 
-    if (state.unsubscribePredictions) {
-        state.unsubscribePredictions();
-    }
+function listenToCurrentPredictions() {
+    if (!state.db || !state.participantId || !state.groupId) return;
+
+    state.unsubscribePredictions?.();
 
     const predictionsQuery = query(
-        collection(state.db, "palpites"),
+        groupCol("palpites"),
         where("participanteId", "==", state.participantId)
     );
 
@@ -657,15 +753,14 @@ function listenToCurrentPredictions() {
 }
 
 function listenToRanking() {
-    if (!state.db) return;
+    if (!state.db || !state.groupId) return;
 
     state.unsubscribeRanking = onSnapshot(
-        collection(state.db, "ranking"),
+        groupCol("ranking"),
         (snapshot) => {
             const ranking = snapshot.docs
                 .map((item) => item.data())
                 .sort((a, b) => b.pontos - a.pontos || b.exatos - a.exatos || a.nome.localeCompare(b.nome));
-
             renderRanking(ranking);
         },
         handleFirebaseError
@@ -673,10 +768,10 @@ function listenToRanking() {
 }
 
 function listenToParticipants() {
-    if (!state.db) return;
+    if (!state.db || !state.groupId) return;
 
     state.unsubscribeParticipants = onSnapshot(
-        collection(state.db, "participantes"),
+        groupCol("participantes"),
         (snapshot) => {
             state.participants = snapshot.docs
                 .map((item) => ({ id: item.id, ...item.data() }))
@@ -689,10 +784,10 @@ function listenToParticipants() {
 }
 
 function listenToAllPredictions() {
-    if (!state.db) return;
+    if (!state.db || !state.groupId) return;
 
     state.unsubscribeAllPredictions = onSnapshot(
-        collection(state.db, "palpites"),
+        groupCol("palpites"),
         (snapshot) => {
             state.predictions = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
             els.resultsCount.textContent = `${state.predictions.length} ${state.predictions.length === 1 ? "palpite" : "palpites"}`;
@@ -703,10 +798,10 @@ function listenToAllPredictions() {
 }
 
 function listenToResults() {
-    if (!state.db) return;
+    if (!state.db || !state.groupId) return;
 
     state.unsubscribeResults = onSnapshot(
-        collection(state.db, "resultados"),
+        groupCol("resultados"),
         (snapshot) => {
             state.results = new Map(snapshot.docs.map((item) => [Number(item.data().matchId), item.data()]));
             els.totalResults.textContent = String(snapshot.size);
@@ -717,12 +812,19 @@ function listenToResults() {
     );
 }
 
+// ─── Salvar palpites ──────────────────────────────────────────────────────────
+
 async function savePredictions(event) {
     event.preventDefault();
     const submitButton = els.bolaoForm.querySelector("button[type='submit']");
 
     if (!state.db) {
         showPreviewMessage("Configure o Firebase no topo do app.js antes de salvar.");
+        return;
+    }
+
+    if (!state.groupId) {
+        showPreviewMessage("Selecione um grupo antes de salvar os palpites.");
         return;
     }
 
@@ -749,7 +851,7 @@ async function savePredictions(event) {
         const batch = writeBatch(state.db);
 
         predictions.forEach((prediction) => {
-            const predictionRef = doc(collection(state.db, "palpites"), `${state.participantId}_${prediction.matchId}`);
+            const predictionRef = groupDoc("palpites", `${state.participantId}_${prediction.matchId}`);
             batch.set(predictionRef, {
                 ...prediction,
                 participanteId: state.participantId,
@@ -772,9 +874,9 @@ function collectPredictions() {
     return matches
         .filter((match) => match.status !== "FINISHED")
         .map((match) => ({
-            matchId: match.id,
-            homeTeam: match.homeTeam,
-            awayTeam: match.awayTeam,
+            matchId:   match.id,
+            homeTeam:  match.homeTeam,
+            awayTeam:  match.awayTeam,
             homeGoals: toScore(document.getElementById(`home-${match.id}`).value),
             awayGoals: toScore(document.getElementById(`away-${match.id}`).value)
         }))
@@ -785,7 +887,6 @@ function fillPredictions(predictions) {
     predictions.forEach((prediction) => {
         const home = document.getElementById(`home-${prediction.matchId}`);
         const away = document.getElementById(`away-${prediction.matchId}`);
-
         if (home) home.value = prediction.homeGoals;
         if (away) away.value = prediction.awayGoals;
     });
@@ -799,11 +900,7 @@ function updateSavedPreview(predictions) {
 
     els.savedPredictions.textContent = JSON.stringify(
         predictions.map(({ matchId, homeTeam, awayTeam, homeGoals, awayGoals }) => ({
-            matchId,
-            homeTeam,
-            awayTeam,
-            homeGoals,
-            awayGoals
+            matchId, homeTeam, awayTeam, homeGoals, awayGoals
         })),
         null,
         2
@@ -814,8 +911,10 @@ function showPreviewMessage(message) {
     els.savedPredictions.textContent = message;
 }
 
+// ─── Salvar resultado (admin) ─────────────────────────────────────────────────
+
 async function saveResult(match) {
-    if (!state.db) return;
+    if (!state.db || !state.groupId) return;
 
     const homeGoals = toScore(document.getElementById(`result-home-${match.id}`).value);
     const awayGoals = toScore(document.getElementById(`result-away-${match.id}`).value);
@@ -823,7 +922,7 @@ async function saveResult(match) {
     if (homeGoals === null || awayGoals === null) return;
 
     try {
-        await setDoc(doc(collection(state.db, "resultados"), String(match.id)), {
+        await setDoc(groupDoc("resultados", String(match.id)), {
             matchId: match.id,
             homeGoals,
             awayGoals,
@@ -836,33 +935,35 @@ async function saveResult(match) {
     }
 }
 
+// ─── Recalcular ranking ───────────────────────────────────────────────────────
+
 async function recalculateRanking() {
-    if (!state.db) return;
+    if (!state.db || !state.groupId) return;
 
     const [participantsSnapshot, predictionsSnapshot, resultsSnapshot] = await Promise.all([
-        getDocs(collection(state.db, "participantes")),
-        getDocs(collection(state.db, "palpites")),
-        getDocs(collection(state.db, "resultados"))
+        getDocs(groupCol("participantes")),
+        getDocs(groupCol("palpites")),
+        getDocs(groupCol("resultados"))
     ]);
 
     const participants = participantsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-    const predictions = predictionsSnapshot.docs.map((item) => item.data());
-    const results = new Map(resultsSnapshot.docs.map((item) => [Number(item.data().matchId), item.data()]));
-    const batch = writeBatch(state.db);
+    const predictions  = predictionsSnapshot.docs.map((item) => item.data());
+    const results      = new Map(resultsSnapshot.docs.map((item) => [Number(item.data().matchId), item.data()]));
+    const batch        = writeBatch(state.db);
 
     participants.forEach((participant) => {
         const score = scoreParticipant(
-            predictions.filter((prediction) => prediction.participanteId === participant.id),
+            predictions.filter((p) => p.participanteId === participant.id),
             results
         );
 
-        batch.set(doc(collection(state.db, "ranking"), participant.id), {
+        batch.set(groupDoc("ranking", participant.id), {
             participanteId: participant.id,
-            nome: participant.nome,
-            pontos: score.pontos,
-            exatos: score.exatos,
-            vencedores: score.vencedores,
-            atualizadoEm: serverTimestamp()
+            nome:           participant.nome,
+            pontos:         score.pontos,
+            exatos:         score.exatos,
+            vencedores:     score.vencedores,
+            atualizadoEm:   serverTimestamp()
         }, { merge: true });
     });
 
@@ -870,25 +971,29 @@ async function recalculateRanking() {
     setConnection("Ranking recalculado");
 }
 
+// ─── Pontuação ────────────────────────────────────────────────────────────────
+
 function scoreParticipant(predictions, results) {
     return predictions.reduce((total, prediction) => {
         const result = results.get(Number(prediction.matchId));
         if (!result) return total;
 
         if (prediction.homeGoals === result.homeGoals && prediction.awayGoals === result.awayGoals) {
-            total.pontos += 3;
-            total.exatos += 1;
+            total.pontos  += 3;
+            total.exatos  += 1;
             return total;
         }
 
         if (outcome(prediction.homeGoals, prediction.awayGoals) === outcome(result.homeGoals, result.awayGoals)) {
-            total.pontos += 1;
+            total.pontos     += 1;
             total.vencedores += 1;
         }
 
         return total;
     }, { pontos: 0, exatos: 0, vencedores: 0 });
 }
+
+// ─── Render: ranking ──────────────────────────────────────────────────────────
 
 function renderRanking(ranking) {
     if (!ranking.length) {
@@ -907,6 +1012,8 @@ function renderRanking(ranking) {
     `).join("");
 }
 
+// ─── Render: board de resultados ──────────────────────────────────────────────
+
 function renderResultsBoard() {
     if (!els.resultsBoard) return;
 
@@ -917,14 +1024,14 @@ function renderResultsBoard() {
         return;
     }
 
-    const participantMap = new Map(participants.map((participant) => [participant.id, participant]));
-    const predictionsByMatch = groupPredictionsByMatch(state.predictions);
+    const participantMap      = new Map(participants.map((p) => [p.id, p]));
+    const predictionsByMatch  = groupPredictionsByMatch(state.predictions);
 
     els.resultsBoard.innerHTML = matches.map((match) => {
-        const result = state.results.get(match.id);
+        const result              = state.results.get(match.id);
         const predictionsForMatch = predictionsByMatch.get(match.id) || new Map();
-        const status = result ? "Resultado oficial" : statusLabel(match.status);
-        const rows = buildPredictionRows(participants, participantMap, predictionsForMatch, result);
+        const status              = result ? "Resultado oficial" : statusLabel(match.status);
+        const rows                = buildPredictionRows(participants, participantMap, predictionsForMatch, result);
 
         return `
             <article class="result-card">
@@ -941,12 +1048,10 @@ function renderResultsBoard() {
                     </div>
                     <span class="result-status">${status}</span>
                 </header>
-
                 <div class="result-meta">
                     <span>${formatDateLabel(match.utcDate)}</span>
                     <span>${formatTime(match.utcDate)}</span>
                 </div>
-
                 <div class="prediction-list">
                     ${rows}
                 </div>
@@ -957,13 +1062,10 @@ function renderResultsBoard() {
 
 function groupPredictionsByMatch(predictions) {
     return predictions.reduce((grouped, prediction) => {
-        const matchId = Number(prediction.matchId);
+        const matchId       = Number(prediction.matchId);
         const participantId = prediction.participanteId;
 
-        if (!grouped.has(matchId)) {
-            grouped.set(matchId, new Map());
-        }
-
+        if (!grouped.has(matchId)) grouped.set(matchId, new Map());
         grouped.get(matchId).set(participantId, prediction);
         return grouped;
     }, new Map());
@@ -971,7 +1073,7 @@ function groupPredictionsByMatch(predictions) {
 
 function buildPredictionRows(participants, participantMap, predictionsForMatch, result) {
     const participantIds = new Set([
-        ...participants.map((participant) => participant.id),
+        ...participants.map((p) => p.id),
         ...predictionsForMatch.keys()
     ]);
 
@@ -979,57 +1081,40 @@ function buildPredictionRows(participants, participantMap, predictionsForMatch, 
         return `<div class="prediction-row empty-row">Nenhum palpite para este jogo.</div>`;
     }
 
-    return [...participantIds]
-        .map((participantId) => {
-            const participant = participantMap.get(participantId);
-            const prediction = predictionsForMatch.get(participantId);
-            const name = participant?.nome || prediction?.nome || participantId;
-            const score = prediction ? `${prediction.homeGoals} - ${prediction.awayGoals}` : "--";
-            const points = prediction && result ? scorePrediction(prediction, result) : null;
+    return [...participantIds].map((participantId) => {
+        const participant = participantMap.get(participantId);
+        const prediction  = predictionsForMatch.get(participantId);
+        const name        = participant?.nome || prediction?.nome || participantId;
+        const score       = prediction ? `${prediction.homeGoals} - ${prediction.awayGoals}` : "--";
+        const points      = prediction && result ? scorePrediction(prediction, result) : null;
 
-            return `
-                <div class="prediction-row">
-                    <span class="prediction-name">${escapeHtml(name)}</span>
-                    <span class="prediction-detail">
-                        <span class="prediction-score">${score}</span>
-                        ${points === null ? "" : `<span class="prediction-points points-${points}">${points} pts</span>`}
-                    </span>
-                </div>
-            `;
-        })
-        .join("");
+        return `
+            <div class="prediction-row">
+                <span class="prediction-name">${escapeHtml(name)}</span>
+                <span class="prediction-detail">
+                    <span class="prediction-score">${score}</span>
+                    ${points === null ? "" : `<span class="prediction-points points-${points}">${points} pts</span>`}
+                </span>
+            </div>
+        `;
+    }).join("");
 }
 
 function scorePrediction(prediction, result) {
-    if (prediction.homeGoals === result.homeGoals && prediction.awayGoals === result.awayGoals) {
-        return 3;
-    }
-
-    if (outcome(prediction.homeGoals, prediction.awayGoals) === outcome(result.homeGoals, result.awayGoals)) {
-        return 1;
-    }
-
+    if (prediction.homeGoals === result.homeGoals && prediction.awayGoals === result.awayGoals) return 3;
+    if (outcome(prediction.homeGoals, prediction.awayGoals) === outcome(result.homeGoals, result.awayGoals)) return 1;
     return 0;
 }
 
-function statusLabel(status) {
-    const labels = {
-        FINISHED: "Encerrado",
-        IN_PLAY: "Ao vivo",
-        TIMED: "Aguardando"
-    };
-
-    return labels[status] || status;
-}
+// ─── Admin ────────────────────────────────────────────────────────────────────
 
 function unlockAdmin() {
     if (els.adminPassword.value !== ADMIN_PASSWORD) {
         els.adminMessage.textContent = "Senha incorreta.";
         return;
     }
-
-    els.adminLogin.hidden = true;
-    els.adminPanel.hidden = false;
+    els.adminLogin.hidden  = true;
+    els.adminPanel.hidden  = false;
     els.adminMessage.textContent = "";
 }
 
@@ -1037,26 +1122,22 @@ function fillAdminResults() {
     state.results.forEach((result, matchId) => {
         const home = document.getElementById(`result-home-${matchId}`);
         const away = document.getElementById(`result-away-${matchId}`);
-
         if (home) home.value = result.homeGoals;
         if (away) away.value = result.awayGoals;
     });
 }
 
+// ─── Utilitários ──────────────────────────────────────────────────────────────
+
 function flagMarkup(teamName) {
     const code = flagCodes[teamName];
-
-    if (!code) {
-        return `<span class="flag flag-fallback" aria-hidden="true">?</span>`;
-    }
-
+    if (!code) return `<span class="flag flag-fallback" aria-hidden="true">?</span>`;
     return `
         <img
             class="flag"
             src="https://flagcdn.com/w80/${code}.png"
             srcset="https://flagcdn.com/w160/${code}.png 2x"
-            width="40"
-            height="30"
+            width="40" height="30"
             alt="Bandeira de ${escapeHtml(teamName)}"
             loading="lazy"
         >
@@ -1065,40 +1146,36 @@ function flagMarkup(teamName) {
 
 function flagInlineMarkup(teamName) {
     const code = flagCodes[teamName];
-
-    if (!code) {
-        return `<span class="flag-inline" aria-hidden="true">?</span>`;
-    }
-
+    if (!code) return `<span class="flag-inline" aria-hidden="true">?</span>`;
     return `<img class="flag-inline" src="https://flagcdn.com/w40/${code}.png" width="24" height="18" alt="Bandeira de ${escapeHtml(teamName)}" loading="lazy">`;
 }
 
 function statusBadge(status) {
     const statusMap = {
         FINISHED: ["finished", "ENCERRADO"],
-        IN_PLAY: ["live", "AO VIVO"],
-        TIMED: ["waiting", "AGUARDANDO"]
+        IN_PLAY:  ["live",     "AO VIVO"],
+        TIMED:    ["waiting",  "AGUARDANDO"]
     };
     const [className, label] = statusMap[status] || ["waiting", status];
-
     return `<span class="status-badge ${className}">${label}</span>`;
+}
+
+function statusLabel(status) {
+    const labels = { FINISHED: "Encerrado", IN_PLAY: "Ao vivo", TIMED: "Aguardando" };
+    return labels[status] || status;
 }
 
 function formatDateLabel(utcDate) {
     const formatted = new Intl.DateTimeFormat("pt-BR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
+        weekday: "long", day: "numeric", month: "long",
         timeZone: "America/Sao_Paulo"
     }).format(new Date(utcDate));
-
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
 function formatTime(utcDate) {
     return new Intl.DateTimeFormat("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
+        hour: "2-digit", minute: "2-digit",
         timeZone: "America/Sao_Paulo"
     }).format(new Date(utcDate));
 }
@@ -1107,8 +1184,7 @@ function normalizeId(value) {
     return value
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .trim()
+        .toLowerCase().trim()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "")
         .slice(0, 80);
@@ -1116,11 +1192,8 @@ function normalizeId(value) {
 
 function escapeHtml(value) {
     return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 function toScore(value) {
@@ -1134,7 +1207,7 @@ function outcome(homeGoals, awayGoals) {
 }
 
 function isFirebaseConfigured(config) {
-    return Boolean(config.apiKey && config.projectId && !Object.values(config).some((value) => value === "..."));
+    return Boolean(config.apiKey && config.projectId && !Object.values(config).some((v) => v === "..."));
 }
 
 function setConnection(text) {
@@ -1147,26 +1220,17 @@ function hideLoading() {
 
 function handleFirebaseError(error) {
     console.error(error);
-
-    const message = friendlyFirebaseMessage(error);
     setConnection("Erro no Firestore");
-    showPreviewMessage(message);
+    showPreviewMessage(friendlyFirebaseMessage(error));
 }
 
 function friendlyFirebaseMessage(error) {
     const code = error?.code || "";
-
-    if (code.includes("permission-denied")) {
+    if (code.includes("permission-denied"))
         return "O Firestore recusou a gravação. Publique as regras de desenvolvimento no Firebase Console e tente novamente.";
-    }
-
-    if (code.includes("unavailable") || code.includes("deadline-exceeded")) {
+    if (code.includes("unavailable") || code.includes("deadline-exceeded"))
         return "Não foi possível conectar ao Firestore agora. Verifique a conexão e tente novamente.";
-    }
-
-    if (code.includes("failed-precondition")) {
+    if (code.includes("failed-precondition"))
         return "O Firestore pediu uma configuração adicional. Confira o console do navegador para ver o detalhe.";
-    }
-
     return `Não foi possível salvar no Firestore. Detalhe: ${error?.message || "erro desconhecido"}`;
 }
