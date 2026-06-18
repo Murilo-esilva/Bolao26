@@ -814,80 +814,31 @@ function renderResultsBoard() {
         return;
     }
 
-    const participantMap = new Map(participants.map((participant) => [participant.id, participant]));
+    const participantMap = new Map(
+        participants.map((participant) => [participant.id, participant])
+    );
+
     const predictionsByMatch = groupPredictionsByMatch(state.predictions);
 
-    // Renderiza a lista de cartões de resultados cruzando dados locais com o Firebase
     els.resultsBoard.innerHTML = matches.map((match) => {
-        // CORREÇÃO CRÍTICA: Força a busca no mapa usando tipo numérico (Number)
         const result = state.results.get(Number(match.id));
-        const predictionsForMatch = predictionsByMatch.get(Number(match.id)) || new Map();
-        const status = result ? "Resultado oficial" : statusLabel(match.status);
-        const rows = buildPredictionRows(participants, participantMap, predictionsForMatch, result);
+        const predictionsForMatch =
+            predictionsByMatch.get(Number(match.id)) || new Map();
+
+        const status = result
+            ? "Resultado oficial"
+            : statusLabel(match.status);
+
+        const rows = buildPredictionRows(
+            participants,
+            participantMap,
+            predictionsForMatch,
+            result
+        );
 
         return `
             <article class="result-card">
-                <header class="result-card-header">
-                    <div class="result-teams">
-                        ${flagInlineMarkup(match.homeTeam)}
-                        <strong>${escapeHtml(match.homeTeam)}</strong>
-                        <span>x</span>
-                        <strong>${escapeHtml(match.awayTeam)}</strong>
-                        ${flagInlineMarkup(match.awayTeam)}
-                    </div>
-                    <div class="result-score ${result ? "has-result" : ""}">
-                        ${result ? `${result.homeGoals} - ${result.awayGoals}` : "Aguardando"}
-                    </div>
-                    <span class="result-status">${status}</span>
-                </header>
-
-                <div class="result-meta">
-                    <span>${formatDateLabel(match.utcDate)}</span>
-                    <span>${formatTime(match.utcDate)}</span>
-                </div>
-
-                <div class="prediction-list">
-                    ${rows}
-                </div>
-            </article>
-        `;
-    }).join("");
-}
-
-
-    const participantMap = new Map(participants.map((participant) => [participant.id, participant]));
-    const predictionsByMatch = groupPredictionsByMatch(state.predictions);
-
-    els.resultsBoard.innerHTML = matches.map((match) => {
-        const result = state.results.get(match.id);
-        const predictionsForMatch = predictionsByMatch.get(match.id) || new Map();
-        const status = result ? "Resultado oficial" : statusLabel(match.status);
-        const rows = buildPredictionRows(participants, participantMap, predictionsForMatch, result);
-
-        return `
-            <article class="result-card">
-                <header class="result-card-header">
-                    <div class="result-teams">
-                        ${flagInlineMarkup(match.homeTeam)}
-                        <strong>${escapeHtml(match.homeTeam)}</strong>
-                        <span>x</span>
-                        <strong>${escapeHtml(match.awayTeam)}</strong>
-                        ${flagInlineMarkup(match.awayTeam)}
-                    </div>
-                    <div class="result-score ${result ? "has-result" : ""}">
-                        ${result ? `${result.homeGoals} - ${result.awayGoals}` : "Aguardando"}
-                    </div>
-                    <span class="result-status">${status}</span>
-                </header>
-
-                <div class="result-meta">
-                    <span>${formatDateLabel(match.utcDate)}</span>
-                    <span>${formatTime(match.utcDate)}</span>
-                </div>
-
-                <div class="prediction-list">
-                    ${rows}
-                </div>
+                ...
             </article>
         `;
     }).join("");
