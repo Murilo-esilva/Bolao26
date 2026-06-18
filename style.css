@@ -811,32 +811,262 @@ tbody tr:first-child td:first-child {
     animation: spin 800ms linear infinite;
 }
 
+/* ─── Participant panel: group banner ───────────────────────────────────────── */
+
+.group-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.group-banner-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.group-banner-info strong {
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: #ffffff;
+}
+
+.change-group-btn {
+    flex: 0 0 auto;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 999px;
+    padding: 0.55rem 0.9rem;
+    background: rgba(59, 130, 246, 0.1);
+    color: #bfdbfe;
+    font-size: 0.78rem;
+    font-weight: 800;
+    transition: background 160ms ease, border-color 160ms ease;
+}
+
+.change-group-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.55);
+}
+
+.participant-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem;
+    align-items: end;
+}
+
+.participant-grid > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.participant-grid input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.95rem 1rem;
+    background: var(--surface-2);
+    color: var(--text);
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.participant-grid input:focus {
+    border-color: rgba(59, 130, 246, 0.8);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+
+/* ─── Modal de seleção de grupo ─────────────────────────────────────────────── */
+
+.group-dialog {
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.group-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+}
+
+.group-dialog-inner {
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.group-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.group-dialog-header .brand-mark {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    font-size: 1.1rem;
+}
+
+.group-dialog-header .eyebrow {
+    margin-bottom: 0.3rem;
+}
+
+.group-dialog-header h2 {
+    font-size: 1.4rem;
+}
+
+.group-create label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.group-create-row {
+    display: flex;
+    gap: 0.65rem;
+}
+
+.group-create-row input {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.85rem 1rem;
+    background: var(--surface-2);
+    color: var(--text);
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.group-create-row input:focus {
+    border-color: rgba(59, 130, 246, 0.8);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+
+.group-create-row .save-button {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    padding: 0.85rem 1.25rem;
+    font-size: 0.82rem;
+}
+
+.group-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--subtle);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.group-divider::before,
+.group-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+}
+
+.group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.group-list-empty {
+    padding: 1.25rem;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius);
+    color: var(--muted);
+    text-align: center;
+    font-size: 0.88rem;
+}
+
+.group-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text);
+    text-align: left;
+    transition: border-color 160ms ease, background 160ms ease, transform 120ms ease;
+}
+
+.group-item:hover {
+    border-color: rgba(59, 130, 246, 0.42);
+    background: rgba(59, 130, 246, 0.08);
+    transform: translateX(2px);
+}
+
+.group-item-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(139, 92, 246, 0.25));
+    color: #bfdbfe;
+    font-size: 0.95rem;
+    font-weight: 900;
+}
+
+.group-item-name {
+    flex: 1;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.group-item-arrow {
+    color: var(--subtle);
+    font-size: 1.1rem;
+    transition: transform 160ms ease, color 160ms ease;
+}
+
+.group-item:hover .group-item-arrow {
+    transform: translateX(3px);
+    color: var(--blue);
+}
+
+/* ─── Animações ─────────────────────────────────────────────────────────────── */
+
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes livePulse {
-    0%,
-    100% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
-    }
-    50% {
-        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
-    }
+    0%,  100% { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.55); }
+    50%        { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
+
+/* ─── Responsivo ────────────────────────────────────────────────────────────── */
 
 @media (max-width: 820px) {
     .app-header {
@@ -858,9 +1088,8 @@ tbody tr:first-child td:first-child {
         padding-top: 1.4rem;
     }
 
-    .participant-row {
-        align-items: stretch;
-        flex-direction: column;
+    .participant-grid {
+        grid-template-columns: 1fr;
     }
 
     .connection-pill {
@@ -919,6 +1148,11 @@ tbody tr:first-child td:first-child {
     .result-status {
         width: fit-content;
     }
+
+    .group-banner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 
 @media (max-width: 560px) {
@@ -946,5 +1180,17 @@ tbody tr:first-child td:first-child {
 
     .admin-result-row > div {
         grid-column: 1 / -1;
+    }
+
+    .group-dialog-inner {
+        padding: 1.25rem;
+    }
+
+    .group-create-row {
+        flex-direction: column;
+    }
+
+    .group-create-row .save-button {
+        width: 100%;
     }
 }
