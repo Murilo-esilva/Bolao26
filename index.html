@@ -60,45 +60,42 @@
     </div>
 
     <div class="participant-grid">
-        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
-            <div style="flex: 1; min-width: 200px;">
-                <label for="groupName">Grupo do bolão</label>
-                <input id="groupName" name="groupName" type="text"
-                    autocomplete="off" placeholder="Nome do grupo">
-            </div>
 
-            <div style="flex: 1; min-width: 200px;">
-                <label for="groupPassword">Senha do grupo</label>
-                <input id="groupPassword" name="groupPassword" type="password"
-                    placeholder="Senha para acessar/criar">
-            </div>
+    <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+        <div style="flex:1; min-width:200px;">
+            <label for="groupName">Grupo do bolão</label>
+            <input id="groupName" type="text" placeholder="Nome do grupo">
+        </div>
 
-            <div style="display: flex; align-items: flex-end;">
-                <button id="btnEnterGroup" type="button"
+        <div style="flex:1; min-width:200px;">
+            <label for="groupPassword">Senha do grupo</label>
+            <input id="groupPassword" type="password" placeholder="Senha">
+        </div>
+
+        <div style="display:flex; align-items:flex-end;">
+            <button id="btnEnterGroup"
+                    type="button"
                     class="save-button compact"
-                    style="margin: 0; padding: 0.95rem 1.2rem;">
-                    Acessar
-                </button>
-            </div>
+                    style="margin:0;">
+                Acessar
+            </button>
         </div>
-
-        <!-- Nome do participante logo abaixo -->
-        <div style="margin-bottom: 1rem;">
-            <label for="participantName">Seu nome de participante</label>
-            <input id="participantName"
-                name="participantName"
-                type="text"
-                autocomplete="name"
-                placeholder="Digite seu nome (após acessar o grupo)"
-                disabled>
-        </div>
-
-        <span class="connection-pill"
-            id="connectionStatus"
-            style="display: inline-block;">
-            Aguardando acesso ao grupo...
-        </span>
     </div>
+
+    <div style="margin-top:1rem;">
+        <label for="participantName">Seu nome de participante</label>
+        <input id="participantName"
+               type="text"
+               autocomplete="name"
+               placeholder="Digite seu nome"
+               disabled>
+    </div>
+
+    <span class="connection-pill" id="connectionStatus">
+        Aguardando acesso ao grupo...
+    </span>
+
+</div>
 </section>
 
         <section class="tab-panel active" data-panel="palpites">
