@@ -599,8 +599,8 @@ async function syncOfficialResults() {
     
     try {
         const response = await fetch(N8N_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" }
+            method: "GET",
+            headers: { "Accept": "application/json" }
         });
 
         if (!response.ok) throw new Error(`Status ${response.status}`);
