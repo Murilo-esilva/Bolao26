@@ -593,10 +593,9 @@ async function syncOfficialResults() {
 
     adminButton.disabled = true;
     syncMessage.style.color = "var(--text-muted, #666)";
-    syncMessage.textContent = "⏳ n8n processando e sincronizando dados da Copa...";
+    syncMessage.textContent = "⏳ n8n filtrando placares oficiais...";
 
-    // Configure com a URL de Produção (Webhook) do seu n8n
-    const N8N_WEBHOOK_URL = "https://n8n-homol.unicoob.local/webhook/sincronizar-copa"; 
+    const N8N_WEBHOOK_URL = "https://seu-n8n.com"; 
     
     try {
         const response = await fetch(N8N_WEBHOOK_URL, {
@@ -608,54 +607,42 @@ async function syncOfficialResults() {
 
         const data = await response.json();
         
-        // Validação da estrutura: O payload fornecido traz o nó "matches"
-        if (!data || !data.matches) {
-            throw new Error("A resposta da automação não contém o campo 'matches'.");
+        if (!data || !data.matches || data.matches.length === 0) {
+            syncMessage.style.color = "orange";
+            syncMessage.textContent = "🎉 O n8n checou, mas não há novos resultados encerrados.";
+            return;
         }
 
         const batch = writeBatch(state.db);
         let countUpdates = 0;
         const localMatchIds = new Set(matches.map(m => Number(m.id)));
 
+        // Como o n8n já filtrou tudo, a leitura aqui ficou direta e rápida!
         data.matches.forEach((apiMatch) => {
-            // Prevenção contra objetos vazios ou truncados no fim do JSON
-            if (!apiMatch || !apiMatch.id || !apiMatch.score) return;
-
             const matchId = Number(apiMatch.id);
 
-            // Verifica se o ID bate com sua lista local e se o jogo de fato encerrou
-            if (localMatchIds.has(matchId) && apiMatch.status === "FINISHED") {
-                const homeGoals = apiMatch.score.fullTime.home;
-                const awayGoals = apiMatch.score.fullTime.away;
+            if (localMatchIds.has(matchId)) {
+                const resultRef = doc(collection(state.db, "resultados"), String(matchId));
+                
+                batch.set(resultRef, {
+                    matchId: matchId,
+                    homeGoals: Number(apiMatch.homeGoals),
+                    awayGoals: Number(apiMatch.awayGoals),
+                    registradoEm: serverTimestamp()
+                }, { merge: true });
 
-                // Garante que existem gols numéricos preenchidos antes de salvar
-                if (homeGoals !== null && awayGoals !== null) {
-                    const resultRef = doc(collection(state.db, "resultados"), String(matchId));
-                    
-                    batch.set(resultRef, {
-                        matchId: matchId,
-                        homeGoals: Number(homeGoals),
-                        awayGoals: Number(awayGoals),
-                        registradoEm: serverTimestamp()
-                    }, { merge: true });
-
-                    countUpdates++;
-                }
+                countUpdates++;
             }
         });
 
         if (countUpdates > 0) {
-            // Executa as gravações em bloco de uma só vez
             await batch.commit();
-            
-            // Recalcula os pontos baseados nos novos placares oficiais
             await recalculateRanking(); 
-            
             syncMessage.style.color = "green";
-            syncMessage.textContent = `✅ Sucesso! Os jogos foram integrados via n8n e o ranking atualizado!`;
+            syncMessage.textContent = `✅ Sucesso! O n8n processou e ${countUpdates} jogos foram sincronizados!`;
         } else {
             syncMessage.style.color = "orange";
-            syncMessage.textContent = "🎉 O n8n checou a API, mas não encontrou novos jogos encerrados.";
+            syncMessage.textContent = "Nenhum jogo retornado pelo n8n corresponde aos IDs locais.";
         }
 
     } catch (error) {
@@ -666,6 +653,7 @@ async function syncOfficialResults() {
         adminButton.disabled = false;
     }
 }
+
 
 async function recalculateRanking() {
     if (!state.db) return;
