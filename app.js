@@ -420,7 +420,23 @@ function listenToResults() {
     state.unsubscribeResults = onSnapshot(
         collection(state.db, "resultados"),
         (snapshot) => {
-            state.results = new Map(snapshot.docs.map((item) => [Number(item.data().matchId), item.data()]));
+            // CORREÇÃO: Força tanto a chave do mapa quanto a propriedade interna do documento 
+            // a serem resolvidas estritamente como Number, eliminando strings perdidas no banco
+            state.results = new Map(snapshot.docs.map((item) => {
+                const data = item.data();
+                const idNumerico = Number(data.matchId) || Number(item.id);
+                return [
+                    idNumerico, 
+                    {
+                        ...data,
+                        matchId: idNumerico,
+                        homeGoals: Number(data.homeGoals),
+                        awayGoals: Number(data.awayGoals)
+                    }
+                ];
+            }));
+
+            // Atualiza os contadores globais da interface do usuário
             els.totalResults.textContent = String(snapshot.size);
             fillAdminResults();
             renderResultsBoard();
@@ -428,7 +444,6 @@ function listenToResults() {
         handleFirebaseError
     );
 }
-
 async function savePredictions(event) {
     event.preventDefault();
     const submitButton = els.bolaoForm.querySelector("button[type='submit']");
