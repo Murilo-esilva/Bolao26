@@ -28,15 +28,13 @@ const DEFAULT_GROUP_ID = "geral";
 const DEFAULT_GROUP_NAME = "Geral";
 
 // ─── Configuração da API de resultados ────────────────────────────────────────
-// Obtenha sua chave gratuita em https://www.football-data.org/
-// O plano gratuito cobre Copa do Mundo e tem CORS liberado para browsers.
-const FOOTBALL_DATA_API_KEY = "8c1fd129b7b4474694b6b29c8ea69aad"; // ← cole sua chave aqui
-const FOOTBALL_DATA_BASE    = "https://api.football-data.org/v4";
-const WC_2026_ID            = 2000; // ID da competição Copa 2026
+// A chave da API fica no Cloudflare Worker (worker.js), NUNCA exposta aqui.
+// Após o deploy do Worker, cole a URL gerada abaixo:
+const PROXY_BASE_URL = "https://empty-hill-55bd.murilo-infouem.workers.dev/"; // ← ex: "https://bolao-proxy.SEU_USUARIO.workers.dev"
 
 // Intervalo de polling enquanto há jogo ao vivo (ms)
-const POLL_INTERVAL_LIVE    = 60_000;  // 60s
-const POLL_INTERVAL_IDLE    = 300_000; // 5min (sem jogos ao vivo)
+const POLL_INTERVAL_LIVE = 60_000;  // 60s durante jogos ao vivo
+const POLL_INTERVAL_IDLE = 300_000; // 5min sem jogos ativos
 
 const matches = [
   { "id": 537397, "utcDate": "2026-06-17T01:00:00Z", "status": "FINISHED", "homeTeam": "Argentina", "awayTeam": "Algeria" },
@@ -683,27 +681,27 @@ async function fetchAndSyncResults({ silent = false } = {}) {
         return;
     }
 
-    if (!FOOTBALL_DATA_API_KEY) {
-        if (!silent) { syncMessage.style.color = "orange"; syncMessage.textContent = "⚠️ Defina FOOTBALL_DATA_API_KEY no topo do app.js."; }
+    if (!PROXY_BASE_URL) {
+        if (!silent) {
+            syncMessage.style.color = "orange";
+            syncMessage.textContent = "⚠️ Configure PROXY_BASE_URL no app.js após o deploy do Cloudflare Worker.";
+        }
         return;
     }
 
     state.isSyncing = true;
     if (adminButton) adminButton.disabled = true;
-    if (!silent) { syncMessage.style.color = "var(--text-muted,#666)"; syncMessage.textContent = "⏳ Buscando placares oficiais..."; }
+    if (!silent) { syncMessage.style.color = "var(--text-muted,#666)"; syncMessage.textContent = "⏳ Buscando placares via proxy..."; }
 
     try {
-        // Busca apenas jogos FINISHED da competição
-        const res = await fetch(
-            `${FOOTBALL_DATA_BASE}/competitions/${WC_2026_ID}/matches?status=FINISHED`,
-            { headers: { "X-Auth-Token": FOOTBALL_DATA_API_KEY } }
-        );
+        // Chamada via proxy Cloudflare Worker — sem CORS, sem API key exposta
+        const res = await fetch(`${PROXY_BASE_URL}/matches/finished`, { method: "GET" });
 
         if (res.status === 429) {
             if (!silent) { syncMessage.style.color = "orange"; syncMessage.textContent = "⏳ Limite de chamadas atingido. Aguarde um minuto."; }
             return;
         }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status} do proxy`);
 
         const data = await res.json();
         const apiMatches = data.matches ?? [];
@@ -790,9 +788,9 @@ function hasLiveMatches() {
 }
 
 function schedulePoll() {
-    if (!FOOTBALL_DATA_API_KEY) {
+    if (!PROXY_BASE_URL) {
         if (els.autoSyncBadge) {
-            els.autoSyncBadge.textContent = "Auto-sync desativado — configure FOOTBALL_DATA_API_KEY no app.js.";
+            els.autoSyncBadge.textContent = "Auto-sync desativado — configure PROXY_BASE_URL no app.js.";
             els.autoSyncBadge.style.color = "#c0392b";
         }
         return;
@@ -814,7 +812,7 @@ function schedulePoll() {
 
 // Inicia polling logo após a inicialização do Firebase
 function startAutoSync() {
-    if (!FOOTBALL_DATA_API_KEY) return;
+    if (!PROXY_BASE_URL) return;
     fetchAndSyncResults({ silent: true }); // primeira chamada imediata
     schedulePoll();
 }
