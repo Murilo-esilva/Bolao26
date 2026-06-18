@@ -27,6 +27,17 @@ const ADMIN_PASSWORD = "COPA2026";
 const DEFAULT_GROUP_ID = "geral";
 const DEFAULT_GROUP_NAME = "Geral";
 
+// ─── Configuração da API de resultados ────────────────────────────────────────
+// Obtenha sua chave gratuita em https://www.football-data.org/
+// O plano gratuito cobre Copa do Mundo e tem CORS liberado para browsers.
+const FOOTBALL_DATA_API_KEY = "8c1fd129b7b4474694b6b29c8ea69aad"; // ← cole sua chave aqui
+const FOOTBALL_DATA_BASE    = "https://api.football-data.org/v4";
+const WC_2026_ID            = 2000; // ID da competição Copa 2026
+
+// Intervalo de polling enquanto há jogo ao vivo (ms)
+const POLL_INTERVAL_LIVE    = 60_000;  // 60s
+const POLL_INTERVAL_IDLE    = 300_000; // 5min (sem jogos ao vivo)
+
 const matches = [
   { "id": 537397, "utcDate": "2026-06-17T01:00:00Z", "status": "FINISHED", "homeTeam": "Argentina", "awayTeam": "Algeria" },
   { "id": 537398, "utcDate": "2026-06-17T04:00:00Z", "status": "FINISHED", "homeTeam": "Austria", "awayTeam": "Jordan" },
@@ -90,7 +101,12 @@ const state = {
     unsubscribeResults: null,
     participants: [],
     predictions: [],
-    results: new Map()
+    results: new Map(),
+
+    // ── Controle de polling de resultados ──────────────────────────────────
+    pollTimer:  null,   // referência do setInterval ativo
+    lastSyncAt: null,   // Date da última sincronização com a API
+    isSyncing:  false,  // lock para evitar chamadas simultâneas
 };
 
 const flags = {
@@ -146,8 +162,9 @@ const els = {
     groupPassword: document.getElementById("groupPassword"), // <--- NOVO
     btnEnterGroup: document.getElementById("btnEnterGroup"), // <--- NOVO
     loadingOverlay: document.getElementById("loadingOverlay"),
-    btnSyncApi: document.getElementById("btnSyncApi"),
-    syncMessage: document.getElementById("syncMessage")
+    btnSyncApi:      document.getElementById("btnSyncApi"),
+    syncMessage:     document.getElementById("syncMessage"),
+    autoSyncBadge:   document.getElementById("autoSyncBadge")
 };
 
 start();
@@ -186,6 +203,9 @@ function start() {
     } finally {
         hideLoading();
     }
+
+    // Inicia sincronização automática com football-data.org (se a chave estiver configurada)
+    startAutoSync();
 }
 
 function bindEvents() {
@@ -426,27 +446,41 @@ function listenToResults() {
 
     state.unsubscribeResults = onSnapshot(
         collection(state.db, "resultados"),
-        (snapshot) => {
-            // CORREÇÃO: Força tanto a chave do mapa quanto a propriedade interna do documento 
-            // a serem resolvidas estritamente como Number, eliminando strings perdidas no banco
+        async (snapshot) => {
+            // Normaliza todos os valores para Number para eliminar inconsistências de tipo no Firestore
+            const previousSize = state.results.size;
+
             state.results = new Map(snapshot.docs.map((item) => {
-                const data = item.data();
+                const data      = item.data();
                 const idNumerico = Number(data.matchId) || Number(item.id);
                 return [
-                    idNumerico, 
+                    idNumerico,
                     {
                         ...data,
-                        matchId: idNumerico,
+                        matchId:   idNumerico,
                         homeGoals: Number(data.homeGoals),
                         awayGoals: Number(data.awayGoals)
                     }
                 ];
             }));
 
-            // Atualiza os contadores globais da interface do usuário
+            // Atualiza contadores e UI
             els.totalResults.textContent = String(snapshot.size);
             fillAdminResults();
             renderResultsBoard();
+            renderGames(); // repinta os cards de palpite com badge ✓ OFICIAL
+
+            // Recalcula ranking automaticamente quando chegam resultados novos
+            const hasNewResults = snapshot.size > previousSize ||
+                snapshot.docChanges().some(change => change.type === "modified");
+
+            if (hasNewResults && state.isGroupAuthenticated) {
+                try {
+                    await recalculateRanking();
+                } catch (err) {
+                    console.warn("[autoRanking]", err);
+                }
+            }
         },
         handleFirebaseError
     );
@@ -607,105 +641,183 @@ async function saveResult(match) {
 
     try {
         setConnection("Gravando resultado oficial...");
-        
-        // Salva na coleção unificada convertendo o ID em String para chave estável
-        await setDoc(doc(collection(state.db, "resultados"), String(match.id)), {
-            matchId: Number(match.id),
-            homeGoals: Number(homeGoals),
-            awayGoals: Number(awayGoals),
+
+        // Grava na coleção unificada com tipos normalizados (Number, nunca String)
+        await setDoc(doc(collection(state.db, "resultados"), String(Number(match.id))), {
+            matchId:      Number(match.id),
+            homeGoals:    Number(homeGoals),
+            awayGoals:    Number(awayGoals),
+            fonte:        "admin-manual",
             registradoEm: serverTimestamp()
         }, { merge: true });
 
-        // Força o recálculo do ranking do grupo ativo
+        // Recálculo do ranking é disparado automaticamente pelo onSnapshot de listenToResults,
+        // mas também chamamos aqui para garantir feedback imediato ao admin.
         await recalculateRanking();
-        
-        alert(`Sucesso: Jogo ${match.homeTeam} x ${match.awayTeam} atualizado!`);
-        setConnection("✅ Resultado oficial gravado!");
+
+        setConnection("✅ Resultado gravado!");
+
+        // Atualiza o painel de sync com timestamp
+        if (els.syncMessage) {
+            const timeStr = new Date().toLocaleTimeString("pt-BR");
+            els.syncMessage.style.color = "green";
+            els.syncMessage.textContent = `✅ ${match.homeTeam} ${homeGoals}x${awayGoals} ${match.awayTeam} salvo às ${timeStr}.`;
+        }
     } catch (error) {
         console.error("Erro ao salvar no Firestore:", error);
         handleFirebaseError(error);
     }
 }
-// 1. Lembre-se de mapear o novo elemento de mensagem no objeto 'els' no topo do seu app.js:
-// els.syncMessage = document.getElementById("syncMessage");
-// els.btnSyncApi = document.getElementById("btnSyncApi");
-async function syncOfficialResults() {
-    const adminButton = els.btnSyncApi;
+// ─── Integração football-data.org ────────────────────────────────────────────
+// Busca resultados FINISHED da Copa 2026, normaliza e grava no Firestore.
+// Chamada segura: verifica chave, trata erros de rede e evita gravações duplicadas.
+
+async function fetchAndSyncResults({ silent = false } = {}) {
+    if (state.isSyncing) return; // evita chamadas simultâneas
+
     const syncMessage = els.syncMessage;
+    const adminButton = els.btnSyncApi;
 
     if (!state.db) {
-        syncMessage.style.color = "red";
-        syncMessage.textContent = "Erro: Firebase não configurado.";
+        if (!silent) { syncMessage.style.color = "red"; syncMessage.textContent = "Erro: Firebase não configurado."; }
         return;
     }
 
-     adminButton.disabled = true;
-    syncMessage.style.color = "var(--text-muted, #666)";
-    syncMessage.textContent = "⏳ n8n processando e filtrando placares oficiais...";
+    if (!FOOTBALL_DATA_API_KEY) {
+        if (!silent) { syncMessage.style.color = "orange"; syncMessage.textContent = "⚠️ Defina FOOTBALL_DATA_API_KEY no topo do app.js."; }
+        return;
+    }
 
-    const N8N_WEBHOOK_URL = "https://n8n-homol.unicoob.local/webhook/sincronizar-copa"; 
-    
+    state.isSyncing = true;
+    if (adminButton) adminButton.disabled = true;
+    if (!silent) { syncMessage.style.color = "var(--text-muted,#666)"; syncMessage.textContent = "⏳ Buscando placares oficiais..."; }
+
     try {
-        // CORREÇÃO: Altera para POST para bater com o n8n, mas mantendo a chamada simples (sem Content-Type customizado)
-        const response = await fetch(N8N_WEBHOOK_URL, {
-            method: "POST",
-            body: "" // Envia um corpo vazio para evitar erros de leitura de requisição nula no n8n
-        });
+        // Busca apenas jogos FINISHED da competição
+        const res = await fetch(
+            `${FOOTBALL_DATA_BASE}/competitions/${WC_2026_ID}/matches?status=FINISHED`,
+            { headers: { "X-Auth-Token": FOOTBALL_DATA_API_KEY } }
+        );
 
-        if (!response.ok) throw new Error(`Status ${response.status}`);
-
-        const data = await response.json();
-        
-        // Validação: Garante que o objeto de resposta possui o array 'matches'
-        if (!data || !Array.isArray(data.matches)) {
-            throw new Error("O n8n não retornou a propriedade 'matches' como uma lista.");
+        if (res.status === 429) {
+            if (!silent) { syncMessage.style.color = "orange"; syncMessage.textContent = "⏳ Limite de chamadas atingido. Aguarde um minuto."; }
+            return;
         }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const batch = writeBatch(state.db);
-        let countUpdates = 0;
-        const localMatchIds = new Set(matches.map(m => Number(m.id)));
+        const data = await res.json();
+        const apiMatches = data.matches ?? [];
 
-        // Varre a lista limpa enviada pelo n8n
-        data.matches.forEach((apiMatch) => {
-            if (!apiMatch || apiMatch.id === undefined) return;
+        // Monta Set dos IDs locais para cruzamento
+        const localIds = new Set(matches.map(m => Number(m.id)));
 
-            const matchId = Number(apiMatch.id);
+        const batch      = writeBatch(state.db);
+        let   countNew   = 0;
+        let   countSkip  = 0;
 
-            // Cruzamento de dados: Só atualiza se o jogo existir no array local do seu Bolão
-            if (localMatchIds.has(matchId)) {
-                const resultRef = doc(collection(state.db, "resultados"), String(matchId));
-                
-                // Grava os gols convertendo para número para evitar problemas de string
-                batch.set(resultRef, {
-                    matchId: matchId,
-                    homeGoals: Number(apiMatch.homeGoals),
-                    awayGoals: Number(apiMatch.awayGoals),
-                    registradoEm: serverTimestamp()
-                }, { merge: true });
+        for (const apiMatch of apiMatches) {
+            const matchId    = Number(apiMatch.id);
+            if (!localIds.has(matchId)) { countSkip++; continue; }
 
-                countUpdates++;
+            const homeGoals  = apiMatch.score?.fullTime?.home ?? null;
+            const awayGoals  = apiMatch.score?.fullTime?.away ?? null;
+            if (homeGoals === null || awayGoals === null) continue;
+
+            // Verifica se já existe resultado idêntico no cache local
+            const cached = state.results.get(matchId);
+            if (cached && cached.homeGoals === homeGoals && cached.awayGoals === awayGoals) {
+                countSkip++;
+                continue;
             }
-        });
 
-        if (countUpdates > 0) {
-            await batch.commit();
-            await recalculateRanking(); 
-            syncMessage.style.color = "green";
-            syncMessage.textContent = `✅ Sucesso! O n8n processou e ${countUpdates} jogos foram sincronizados!`;
-        } else {
-            syncMessage.style.color = "orange";
-            syncMessage.textContent = "🎉 O n8n checou, mas nenhum ID de jogo bateu com os seus dados locais.";
+            batch.set(
+                doc(collection(state.db, "resultados"), String(matchId)),
+                {
+                    matchId:       matchId,
+                    homeGoals:     Number(homeGoals),
+                    awayGoals:     Number(awayGoals),
+                    fonte:         "football-data.org",
+                    registradoEm:  serverTimestamp()
+                },
+                { merge: true }
+            );
+            countNew++;
         }
 
-    } catch (error) {
-        console.error(error);
-        syncMessage.style.color = "red";
-        syncMessage.textContent = `❌ Falha na automação: ${error.message}`;
+        if (countNew > 0) {
+            await batch.commit();
+            await recalculateRanking();
+        }
+
+        state.lastSyncAt = new Date();
+        const timeStr    = state.lastSyncAt.toLocaleTimeString("pt-BR");
+
+        if (!silent) {
+            syncMessage.style.color = countNew > 0 ? "green" : "#555";
+            syncMessage.textContent = countNew > 0
+                ? `✅ ${countNew} resultado(s) sincronizado(s) às ${timeStr}.`
+                : `✔ Nenhuma novidade às ${timeStr}. (${countSkip} verificados)`;
+        }
+
+        // Ajusta frequência do polling conforme há jogos ao vivo
+        schedulePoll();
+
+    } catch (err) {
+        console.error("[sync]", err);
+        if (!silent) { syncMessage.style.color = "red"; syncMessage.textContent = `❌ Falha: ${err.message}`; }
     } finally {
-        adminButton.disabled = false;
+        state.isSyncing   = false;
+        if (adminButton) adminButton.disabled = false;
     }
 }
 
+// Alias para o botão do painel admin (chama versão não-silenciosa)
+async function syncOfficialResults() {
+    await fetchAndSyncResults({ silent: false });
+}
+
+// ─── Polling automático ───────────────────────────────────────────────────────
+// Decide o intervalo com base em se há jogos ao vivo agora.
+
+function hasLiveMatches() {
+    const now = Date.now();
+    return matches.some(m => {
+        if (m.status === "FINISHED") return false;
+        const kickoff = new Date(m.utcDate).getTime();
+        // Considera "ao vivo" de 5min antes do kickoff até 2h depois
+        return now >= kickoff - 5 * 60_000 && now <= kickoff + 120 * 60_000;
+    });
+}
+
+function schedulePoll() {
+    if (!FOOTBALL_DATA_API_KEY) {
+        if (els.autoSyncBadge) {
+            els.autoSyncBadge.textContent = "Auto-sync desativado — configure FOOTBALL_DATA_API_KEY no app.js.";
+            els.autoSyncBadge.style.color = "#c0392b";
+        }
+        return;
+    }
+
+    clearInterval(state.pollTimer);
+    const live     = hasLiveMatches();
+    const interval = live ? POLL_INTERVAL_LIVE : POLL_INTERVAL_IDLE;
+    state.pollTimer = setInterval(() => fetchAndSyncResults({ silent: true }), interval);
+
+    if (els.autoSyncBadge) {
+        const mins = Math.round(interval / 60_000);
+        const icon = live ? "🟢" : "🕐";
+        els.autoSyncBadge.style.color = live ? "#1a7a1a" : "#555";
+        els.autoSyncBadge.textContent  =
+            `${icon} Auto-sync ativo — verifica a cada ${mins}min ${live ? "(jogo ao vivo!)" : ""}`;
+    }
+}
+
+// Inicia polling logo após a inicialização do Firebase
+function startAutoSync() {
+    if (!FOOTBALL_DATA_API_KEY) return;
+    fetchAndSyncResults({ silent: true }); // primeira chamada imediata
+    schedulePoll();
+}
 
 
 async function recalculateRanking() {
