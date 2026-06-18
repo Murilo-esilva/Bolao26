@@ -854,6 +854,24 @@ async function recalculateRanking() {
                 doc.data()
             ])
         );
+        participants.forEach((participant) => {
+    const participantPredictions = predictions.filter(
+        prediction => prediction.participanteId === participant.id
+    );
+
+    console.log({
+        participante: participant.nome,
+        participantId: participant.id,
+        palpitesEncontrados: participantPredictions.length
+    });
+
+    const score = scoreParticipant(
+        participantPredictions,
+        results
+    );
+
+    console.log(score);
+});
 
         const batch = writeBatch(state.db);
 
