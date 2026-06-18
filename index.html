@@ -178,11 +178,16 @@
                 <h2>Jogos encerrados</h2>
             </div>
             
-            <!-- NOVO: Bloco de automação via API -->
+            <!-- Bloco de sincronização automática com football-data.org -->
             <div class="admin-automation-zone" style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px dashed var(--border-color, #ccc);">
-                <button id="btnSyncApi" class="save-button compact" type="button" style="background-color: #28a745;">
-                    🔄 Sincronizar Placar Oficial
-                </button>
+                <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                    <button id="btnSyncApi" class="save-button compact" type="button" style="background-color: #28a745; margin:0;">
+                        🔄 Sincronizar Agora
+                    </button>
+                    <span id="autoSyncBadge" style="font-size:0.78rem; color:#555; font-style:italic;">
+                        Auto-sync: aguardando configuração da chave API…
+                    </span>
+                </div>
                 <p class="form-message" id="syncMessage" style="margin-top: 0.5rem; font-size: 0.85rem;"></p>
             </div>
 
