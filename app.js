@@ -595,6 +595,7 @@ async function syncOfficialResults() {
     syncMessage.style.color = "var(--text-muted, #666)";
     syncMessage.textContent = "⏳ n8n filtrando placares oficiais...";
 
+    // Substitua pela URL de produção ou teste do seu n8n
     const N8N_WEBHOOK_URL = "https://seu-n8n.com"; 
     
     try {
@@ -607,23 +608,26 @@ async function syncOfficialResults() {
 
         const data = await response.json();
         
-        if (!data || !data.matches || data.matches.length === 0) {
-            syncMessage.style.color = "orange";
-            syncMessage.textContent = "🎉 O n8n checou, mas não há novos resultados encerrados.";
-            return;
+        // Validação: Garante que o objeto de resposta possui o array 'matches'
+        if (!data || !Array.isArray(data.matches)) {
+            throw new Error("O n8n não retornou a propriedade 'matches' como uma lista.");
         }
 
         const batch = writeBatch(state.db);
         let countUpdates = 0;
         const localMatchIds = new Set(matches.map(m => Number(m.id)));
 
-        // Como o n8n já filtrou tudo, a leitura aqui ficou direta e rápida!
+        // Varre a lista limpa enviada pelo n8n
         data.matches.forEach((apiMatch) => {
+            if (!apiMatch || apiMatch.id === undefined) return;
+
             const matchId = Number(apiMatch.id);
 
+            // Cruzamento de dados: Só atualiza se o jogo existir no array local do seu Bolão
             if (localMatchIds.has(matchId)) {
                 const resultRef = doc(collection(state.db, "resultados"), String(matchId));
                 
+                // Grava os gols convertendo para número para evitar problemas de string
                 batch.set(resultRef, {
                     matchId: matchId,
                     homeGoals: Number(apiMatch.homeGoals),
@@ -642,7 +646,7 @@ async function syncOfficialResults() {
             syncMessage.textContent = `✅ Sucesso! O n8n processou e ${countUpdates} jogos foram sincronizados!`;
         } else {
             syncMessage.style.color = "orange";
-            syncMessage.textContent = "Nenhum jogo retornado pelo n8n corresponde aos IDs locais.";
+            syncMessage.textContent = "🎉 O n8n checou, mas nenhum ID de jogo bateu com os seus dados locais.";
         }
 
     } catch (error) {
@@ -653,6 +657,7 @@ async function syncOfficialResults() {
         adminButton.disabled = false;
     }
 }
+
 
 
 async function recalculateRanking() {
