@@ -593,27 +593,24 @@ async function syncOfficialResults() {
 
     adminButton.disabled = true;
     syncMessage.style.color = "var(--text-muted, #666)";
-    syncMessage.textContent = "⏳ n8n processando e sincronizando dados da FIFA...";
+    syncMessage.textContent = "⏳ n8n processando e sincronizando dados da Copa...";
 
-    // 🔴 SUBSTITUA PELA URL DE PRODUÇÃO DO SEU WEBHOOK DO N8N
+    // Configure com a URL de Produção (Webhook) do seu n8n
     const N8N_WEBHOOK_URL = "https://n8n-homol.unicoob.local/webhook/sincronizar-copa"; 
     
     try {
-        // Dispara a automação no seu servidor n8n
         const response = await fetch(N8N_WEBHOOK_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" }
         });
 
-        if (!response.ok) {
-            throw new Error(`Erro no servidor n8n: Status ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Status ${response.status}`);
 
         const data = await response.json();
         
-        // Garante que o n8n respondeu com a estrutura de partidas esperada
+        // Validação da estrutura: O payload fornecido traz o nó "matches"
         if (!data || !data.matches) {
-            throw new Error("O servidor n8n não retornou a estrutura de dados correta.");
+            throw new Error("A resposta da automação não contém o campo 'matches'.");
         }
 
         const batch = writeBatch(state.db);
@@ -621,34 +618,44 @@ async function syncOfficialResults() {
         const localMatchIds = new Set(matches.map(m => Number(m.id)));
 
         data.matches.forEach((apiMatch) => {
+            // Prevenção contra objetos vazios ou truncados no fim do JSON
+            if (!apiMatch || !apiMatch.id || !apiMatch.score) return;
+
             const matchId = Number(apiMatch.id);
 
-            // Filtra os jogos locais do bolão que já terminaram de fato
+            // Verifica se o ID bate com sua lista local e se o jogo de fato encerrou
             if (localMatchIds.has(matchId) && apiMatch.status === "FINISHED") {
                 const homeGoals = apiMatch.score.fullTime.home;
                 const awayGoals = apiMatch.score.fullTime.away;
 
+                // Garante que existem gols numéricos preenchidos antes de salvar
                 if (homeGoals !== null && awayGoals !== null) {
                     const resultRef = doc(collection(state.db, "resultados"), String(matchId));
+                    
                     batch.set(resultRef, {
                         matchId: matchId,
                         homeGoals: Number(homeGoals),
                         awayGoals: Number(awayGoals),
                         registradoEm: serverTimestamp()
                     }, { merge: true });
+
                     countUpdates++;
                 }
             }
         });
 
         if (countUpdates > 0) {
+            // Executa as gravações em bloco de uma só vez
             await batch.commit();
+            
+            // Recalcula os pontos baseados nos novos placares oficiais
             await recalculateRanking(); 
+            
             syncMessage.style.color = "green";
-            syncMessage.textContent = `✅ Sucesso! ${countUpdates} jogos integrados via n8n e ranking atualizado!`;
+            syncMessage.textContent = `✅ Sucesso! Os jogos foram integrados via n8n e o ranking atualizado!`;
         } else {
             syncMessage.style.color = "orange";
-            syncMessage.textContent = "🎉 O n8n checou, mas não há novos resultados encerrados na API.";
+            syncMessage.textContent = "🎉 O n8n checou a API, mas não encontrou novos jogos encerrados.";
         }
 
     } catch (error) {
@@ -659,7 +666,6 @@ async function syncOfficialResults() {
         adminButton.disabled = false;
     }
 }
-
 
 async function recalculateRanking() {
     if (!state.db) return;
