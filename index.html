@@ -4,37 +4,132 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bolão da Copa 2026</title>
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <span>Conectando ao placar...</span>
+    </div>
 
-    <header>
-        <h1>🏆 Bolão da Copa 2026</h1>
-        <p>Dê seus palpites para os jogos</p>
+    <header class="app-header">
+        <a class="brand" href="#palpites" aria-label="Bolão da Copa 2026">
+            <span class="brand-mark">26</span>
+            <span>
+                <strong>Bolão da Copa</strong>
+                <small>2026</small>
+            </span>
+        </a>
+
+        <nav class="tabs" aria-label="Navegação principal">
+            <button class="tab-button active" type="button" data-tab="palpites">Palpites</button>
+            <button class="tab-button" type="button" data-tab="ranking">Ranking</button>
+        </nav>
     </header>
 
-    <main>
-
-        <form id="bolaoForm">
-            <div id="games-container"></div>
-
-            <button type="submit">
-                Salvar Palpites
-            </button>
-        </form>
-
-        <section class="saved-section">
-            <h2>Meus Palpites</h2>
-
-            <pre id="savedPredictions">
-Nenhum palpite salvo.
-            </pre>
+    <main class="app-shell">
+        <section class="hero-panel">
+            <div>
+                <p class="eyebrow">Copa do Mundo FIFA 2026</p>
+                <h1>Palpites em tempo real, ranking vivo e disputa até o apito final.</h1>
+            </div>
+            <div class="hero-stats" aria-label="Resumo do bolão">
+                <div>
+                    <strong id="totalGames">0</strong>
+                    <span>jogos</span>
+                </div>
+                <div>
+                    <strong id="totalParticipants">0</strong>
+                    <span>participantes</span>
+                </div>
+                <div>
+                    <strong id="totalResults">0</strong>
+                    <span>resultados</span>
+                </div>
+            </div>
         </section>
 
+        <section class="participant-panel" id="palpites">
+            <label for="participantName">Participante</label>
+            <div class="participant-row">
+                <input id="participantName" name="participantName" type="text" autocomplete="name" placeholder="Digite seu nome para salvar seus palpites">
+                <span class="connection-pill" id="connectionStatus">Firestore pendente</span>
+            </div>
+        </section>
+
+        <section class="tab-panel active" data-panel="palpites">
+            <form id="bolaoForm">
+                <div id="games-container" class="games-container"></div>
+                <button class="save-button" type="submit">
+                    <span aria-hidden="true">↗</span>
+                    Salvar palpites
+                </button>
+            </form>
+
+            <section class="saved-section" aria-live="polite">
+                <h2>Último salvamento</h2>
+                <pre id="savedPredictions">Nenhum palpite salvo nesta sessão.</pre>
+            </section>
+        </section>
+
+        <section class="tab-panel" data-panel="ranking" id="ranking">
+            <div class="section-heading">
+                <p class="eyebrow">Classificação</p>
+                <h2>Ranking dos participantes</h2>
+            </div>
+
+            <div class="ranking-card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pos.</th>
+                            <th>Nome</th>
+                            <th>Pontos</th>
+                            <th>Exatos</th>
+                            <th>Vencedores</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rankingBody">
+                        <tr>
+                            <td colspan="5" class="empty-state">Aguardando ranking.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </main>
 
-    <script src="app.js"></script>
+    <footer class="app-footer">
+        <button id="adminOpen" class="admin-link" type="button">Admin</button>
+    </footer>
 
+    <dialog id="adminDialog" class="admin-dialog">
+        <form method="dialog" class="dialog-close-form">
+            <button class="icon-button" value="close" aria-label="Fechar painel admin">×</button>
+        </form>
+
+        <section id="adminLogin" class="admin-login">
+            <p class="eyebrow">Painel restrito</p>
+            <h2>Registrar resultados</h2>
+            <label for="adminPassword">Senha</label>
+            <input id="adminPassword" type="password" placeholder="Senha do administrador">
+            <button id="adminUnlock" class="save-button compact" type="button">Entrar</button>
+            <p class="form-message" id="adminMessage"></p>
+        </section>
+
+        <section id="adminPanel" class="admin-panel" hidden>
+            <div class="section-heading">
+                <p class="eyebrow">Resultados oficiais</p>
+                <h2>Jogos encerrados</h2>
+            </div>
+            <div id="adminResults" class="admin-results"></div>
+            <button id="recalculateRanking" class="save-button compact" type="button">Recalcular ranking</button>
+        </section>
+    </dialog>
+
+    <script type="module" src="app.js"></script>
 </body>
 </html>
