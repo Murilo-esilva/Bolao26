@@ -30,7 +30,8 @@ const DEFAULT_GROUP_NAME = "Geral";
 // ─── Configuração da API de resultados ────────────────────────────────────────
 // A chave da API fica no Cloudflare Worker (worker.js), NUNCA exposta aqui.
 // Após o deploy do Worker, cole a URL gerada abaixo:
-const PROXY_BASE_URL = "https://empty-hill-55bd.murilo-infouem.workers.dev/"; // ← ex: "https://bolao-proxy.SEU_USUARIO.workers.dev"
+const base = PROXY_BASE_URL.replace(/\/+$/, ""); // remove barra final se houver
+const res = await fetch(`${base}/matches/finished`, { method: "GET" });
 
 // Intervalo de polling enquanto há jogo ao vivo (ms)
 const POLL_INTERVAL_LIVE = 60_000;  // 60s durante jogos ao vivo
