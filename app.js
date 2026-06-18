@@ -639,16 +639,17 @@ async function syncOfficialResults() {
         return;
     }
 
-    adminButton.disabled = true;
+     adminButton.disabled = true;
     syncMessage.style.color = "var(--text-muted, #666)";
-    syncMessage.textContent = "⏳ n8n filtrando placares oficiais...";
+    syncMessage.textContent = "⏳ n8n processando e filtrando placares oficiais...";
 
-    // Substitua pela URL de produção ou teste do seu n8n
     const N8N_WEBHOOK_URL = "https://n8n-homol.unicoob.local/webhook/sincronizar-copa"; 
     
     try {
+        // CORREÇÃO: Altera para POST para bater com o n8n, mas mantendo a chamada simples (sem Content-Type customizado)
         const response = await fetch(N8N_WEBHOOK_URL, {
-            method: "GET"
+            method: "POST",
+            body: "" // Envia um corpo vazio para evitar erros de leitura de requisição nula no n8n
         });
 
         if (!response.ok) throw new Error(`Status ${response.status}`);
