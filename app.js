@@ -147,6 +147,8 @@ const els = {
     groupPassword: document.getElementById("groupPassword"), // <--- NOVO
     btnEnterGroup: document.getElementById("btnEnterGroup"), // <--- NOVO
     loadingOverlay: document.getElementById("loadingOverlay"),
+    btnSyncApi: document.getElementById("btnSyncApi"),
+    syncMessage: document.getElementById("syncMessage")
 };
 
 start();
@@ -204,6 +206,7 @@ function bindEvents() {
     els.adminOpen.addEventListener("click", () => els.adminDialog.showModal());
     els.adminUnlock.addEventListener("click", unlockAdmin);
     els.recalculateRanking.addEventListener("click", () => recalculateRanking().catch(handleFirebaseError));
+    els.btnSyncApi?.addEventListener("click", syncOfficialResults);
 }
 
 async function authenticateGroup() {
@@ -574,6 +577,78 @@ async function saveResult(match) {
         handleFirebaseError(error);
     }
 }
+
+// 1. Lembre-se de mapear o novo elemento de mensagem no objeto 'els' no topo do seu app.js:
+// els.syncMessage = document.getElementById("syncMessage");
+// els.btnSyncApi = document.getElementById("btnSyncApi");
+
+async function syncOfficialResults() {
+    const adminButton = els.btnSyncApi;
+    const syncMessage = els.syncMessage;
+
+    if (!state.db) {
+        syncMessage.style.color = "red";
+        syncMessage.textContent = "Erro: Firebase não configurado.";
+        return;
+    }
+
+    adminButton.disabled = true;
+    syncMessage.style.color = "var(--text-muted, #666)";
+    syncMessage.textContent = "⏳ Conectando à API da FIFA e buscando placares...";
+
+    const API_TOKEN = "SEU_TOKEN_AQUI"; 
+    
+    try {
+        const response = await fetch("https://football-data.org", {
+            headers: { "X-Auth-Token": API_TOKEN }
+        });
+
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+
+        const data = await response.json();
+        const batch = writeBatch(state.db);
+        let countUpdates = 0;
+        const localMatchIds = new Set(matches.map(m => Number(m.id)));
+
+        data.matches.forEach((apiMatch) => {
+            const matchId = Number(apiMatch.id);
+
+            if (localMatchIds.has(matchId) && apiMatch.status === "FINISHED") {
+                const homeGoals = apiMatch.score.fullTime.home;
+                const awayGoals = apiMatch.score.fullTime.away;
+
+                if (homeGoals !== null && awayGoals !== null) {
+                    const resultRef = doc(collection(state.db, "resultados"), String(matchId));
+                    batch.set(resultRef, {
+                        matchId: matchId,
+                        homeGoals: Number(homeGoals),
+                        awayGoals: Number(awayGoals),
+                        registradoEm: serverTimestamp()
+                    }, { merge: true });
+                    countUpdates++;
+                }
+            }
+        });
+
+        if (countUpdates > 0) {
+            await batch.commit();
+            await recalculateRanking(); 
+            syncMessage.style.color = "green";
+            syncMessage.textContent = `✅ Sucesso! ${countUpdates} jogos atualizados e ranking recalculado!`;
+        } else {
+            syncMessage.style.color = "orange";
+            syncMessage.textContent = "🎉 Nenhum resultado novo encontrado na API.";
+        }
+
+    } catch (error) {
+        console.error(error);
+        syncMessage.style.color = "red";
+        syncMessage.textContent = `❌ Falha na sincronização: ${error.message}`;
+    } finally {
+        adminButton.disabled = false;
+    }
+}
+
 
 async function recalculateRanking() {
     if (!state.db) return;
