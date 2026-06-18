@@ -803,42 +803,58 @@ function renderRanking(ranking) {
         </tr>
     `).join("");
 }
-
 function renderResultsBoard() {
     if (!els.resultsBoard) return;
 
     const participants = state.participants;
 
+    // Se houver palpites mas nenhum participante carregou, aguarda a sincronização do Firestore
     if (!participants.length && !state.predictions.length) {
         els.resultsBoard.innerHTML = `<div class="empty-results">Nenhum participante ou palpite salvo ainda.</div>`;
         return;
     }
 
-    const participantMap = new Map(
-        participants.map((participant) => [participant.id, participant])
-    );
-
+    const participantMap = new Map(participants.map((participant) => [String(participant.id), participant]));
     const predictionsByMatch = groupPredictionsByMatch(state.predictions);
 
     els.resultsBoard.innerHTML = matches.map((match) => {
-        const result = state.results.get(Number(match.id));
-        const predictionsForMatch =
-            predictionsByMatch.get(Number(match.id)) || new Map();
+        const matchIdNumerico = Number(match.id);
+        
+        // CORREÇÃO DE TIPAGEM: Força a busca como Number estrito
+        const result = state.results.get(matchIdNumerico);
+        const predictionsForMatch = predictionsByMatch.get(matchIdNumerico) || new Map();
+        
+        const status = result ? "✓ Resultado oficial" : statusLabel(match.status);
+        const rows = buildPredictionRows(participants, participantMap, predictionsForMatch, result);
 
-        const status = result
-            ? "Resultado oficial"
-            : statusLabel(match.status);
-
-        const rows = buildPredictionRows(
-            participants,
-            participantMap,
-            predictionsForMatch,
-            result
-        );
+        // Define estilos dinâmicos de confirmação visual para o administrador e participantes
+        const cardStyle = result ? "border: 2px solid #28a745; background-color: rgba(40, 167, 69, 0.05);" : "";
+        const headerStyle = result ? "color: #28a745; font-weight: bold;" : "";
 
         return `
-            <article class="result-card">
-                ...
+            <article class="result-card" style="${cardStyle}">
+                <header class="result-card-header">
+                    <div class="result-teams">
+                        ${flagInlineMarkup(match.homeTeam)}
+                        <strong>${escapeHtml(match.homeTeam)}</strong>
+                        <span>x</span>
+                        <strong>${escapeHtml(match.awayTeam)}</strong>
+                        ${flagInlineMarkup(match.awayTeam)}
+                    </div>
+                    <div class="result-score ${result ? "has-result" : ""}" style="${headerStyle}">
+                        ${result ? `${result.homeGoals} - ${result.awayGoals}` : "Aguardando"}
+                    </div>
+                    <span class="result-status" style="${result ? "background-color: #28a745; color: white; padding: 2px 6px; border-radius: 4px;" : ""}">${status}</span>
+                </header>
+
+                <div class="result-meta">
+                    <span>${formatDateLabel(match.utcDate)}</span>
+                    <span>${formatTime(match.utcDate)}</span>
+                </div>
+
+                <div class="prediction-list">
+                    ${rows}
+                </div>
             </article>
         `;
     }).join("");
@@ -846,8 +862,9 @@ function renderResultsBoard() {
 
 function groupPredictionsByMatch(predictions) {
     return predictions.reduce((grouped, prediction) => {
+        // CORREÇÃO: Força o ID do jogo a ser interpretado sempre como Number para bater com as chaves do mapa
         const matchId = Number(prediction.matchId);
-        const participantId = prediction.participanteId;
+        const participantId = String(prediction.participanteId);
 
         if (!grouped.has(matchId)) {
             grouped.set(matchId, new Map());
