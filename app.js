@@ -600,8 +600,7 @@ async function syncOfficialResults() {
     
     try {
         const response = await fetch(N8N_WEBHOOK_URL, {
-            method: "GET",
-            headers: { "Accept": "application/json" }
+            method: "GET"
         });
 
         if (!response.ok) throw new Error(`Status ${response.status}`);
