@@ -819,7 +819,6 @@ function startAutoSync() {
     schedulePoll();
 }
 
-
 async function recalculateRanking() {
     if (!state.db || !state.groupId) return;
 
@@ -841,67 +840,81 @@ async function recalculateRanking() {
                 getDocs(collection(state.db, "resultados"))
             ]);
 
-        const participants = participantsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+        const participants = participantsSnapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data()
         }));
 
-        const predictions = predictionsSnapshot.docs.map(doc => doc.data());
+        const predictions = predictionsSnapshot.docs.map(docSnap => ({
+            ...docSnap.data(),
+            matchId: Number(docSnap.data().matchId),
+            homeGoals: Number(docSnap.data().homeGoals),
+            awayGoals: Number(docSnap.data().awayGoals)
+        }));
 
         const results = new Map(
-            resultsSnapshot.docs.map(doc => [
-                Number(doc.data().matchId),
-                doc.data()
-            ])
+            resultsSnapshot.docs.map(docSnap => {
+                const data = docSnap.data();
+
+                return [
+                    Number(data.matchId),
+                    {
+                        ...data,
+                        matchId: Number(data.matchId),
+                        homeGoals: Number(data.homeGoals),
+                        awayGoals: Number(data.awayGoals)
+                    }
+                ];
+            })
         );
-        participants.forEach((participant) => {
-    const participantPredictions = predictions.filter(
-        prediction => prediction.participanteId === participant.id
-    );
 
-    console.log({
-        participante: participant.nome,
-        participantId: participant.id,
-        palpitesEncontrados: participantPredictions.length
-    });
-
-    const score = scoreParticipant(
-        participantPredictions,
-        results
-    );
-
-    console.log(score);
-});
+        console.log("Grupo:", state.groupId);
+        console.log("Participantes:", participants.length);
+        console.log("Palpites:", predictions.length);
+        console.log("Resultados:", results.size);
 
         const batch = writeBatch(state.db);
 
-        participants.forEach((participant) => {
+        for (const participant of participants) {
+            const participantPredictions = predictions.filter(
+                prediction => prediction.participanteId === participant.id
+            );
+
             const score = scoreParticipant(
-                predictions.filter(
-                    prediction =>
-                        prediction.participanteId === participant.id
-                ),
+                participantPredictions,
                 results
             );
 
+            console.log(
+                participant.nome,
+                participant.id,
+                "Palpites:",
+                participantPredictions.length,
+                "Score:",
+                score
+            );
+
             batch.set(
-                doc(collection(state.db, "ranking"), participant.id),
+                doc(state.db, "ranking", participant.id),
                 {
                     participanteId: participant.id,
                     nome: participant.nome,
-                    groupId: participant.groupId || state.groupId,
-                    pontos: score.pontos,
-                    exatos: score.exatos,
-                    vencedores: score.vencedores,
+                    groupId: state.groupId,
+                    pontos: Number(score.pontos) || 0,
+                    exatos: Number(score.exatos) || 0,
+                    vencedores: Number(score.vencedores) || 0,
                     atualizadoEm: serverTimestamp()
                 },
                 { merge: true }
             );
-        });
+        }
 
         await batch.commit();
+
+        console.log("Ranking recalculado com sucesso");
         setConnection("Ranking recalculado");
     } catch (error) {
+        console.error("Erro ao recalcular ranking:", error);
         handleFirebaseError(error);
     }
 }
