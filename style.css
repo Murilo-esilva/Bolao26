@@ -69,16 +69,15 @@ button {
 
 .participant-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* duas colunas iguais */
-  gap: 1rem; /* espaçamento entre os campos */
-  align-items: end; /* alinha os botões com os inputs */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  align-items: end;
 }
 
 .participant-grid > div {
   display: flex;
   flex-direction: column;
 }
-
 
 .brand-mark {
     display: grid;
