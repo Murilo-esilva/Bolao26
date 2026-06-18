@@ -158,7 +158,7 @@
         <button id="adminOpen" class="admin-link" type="button">Admin</button>
     </footer>
 
-    <dialog id="adminDialog" class="admin-dialog">
+      <dialog id="adminDialog" class="admin-dialog">
         <form method="dialog" class="dialog-close-form">
             <button class="icon-button" value="close" aria-label="Fechar painel admin">×</button>
         </form>
@@ -177,6 +177,15 @@
                 <p class="eyebrow">Resultados oficiais</p>
                 <h2>Jogos encerrados</h2>
             </div>
+            
+            <!-- NOVO: Bloco de automação via API -->
+            <div class="admin-automation-zone" style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px dashed var(--border-color, #ccc);">
+                <button id="btnSyncApi" class="save-button compact" type="button" style="background-color: #28a745;">
+                    🔄 Sincronizar Placar Oficial
+                </button>
+                <p class="form-message" id="syncMessage" style="margin-top: 0.5rem; font-size: 0.85rem;"></p>
+            </div>
+
             <div id="adminResults" class="admin-results"></div>
             <button id="recalculateRanking" class="save-button compact" type="button">Recalcular ranking</button>
         </section>
