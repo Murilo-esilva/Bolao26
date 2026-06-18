@@ -932,8 +932,6 @@ function fillAdminResults() {
         if (away && document.activeElement !== away) away.value = result.awayGoals;
     });
 }
-    });
-}
 
 function flagMarkup(teamName) {
     const code = flagCodes[teamName];
