@@ -333,35 +333,6 @@ function renderGames() {
     els.gamesContainer.replaceChildren(fragment);
 }
 
-function renderAdminResults() {
-    const finishedMatches = matches.filter((match) => match.status === "FINISHED");
-    const fragment = document.createDocumentFragment();
-
-    finishedMatches.forEach((match) => {
-        const row = document.createElement("div");
-        row.className = "admin-result-row";
-        row.innerHTML = `
-            <div>
-                <strong>${flagInlineMarkup(match.homeTeam)} ${escapeHtml(match.homeTeam)} x ${escapeHtml(match.awayTeam)} ${flagInlineMarkup(match.awayTeam)}</strong>
-                <span>${formatDateLabel(match.utcDate)} • ${formatTime(match.utcDate)}</span>
-            </div>
-            <input type="number" min="0" inputmode="numeric" id="result-home-${match.id}" aria-label="Gols reais de ${escapeHtml(match.homeTeam)}">
-            <input type="number" min="0" inputmode="numeric" id="result-away-${match.id}" aria-label="Gols reais de ${escapeHtml(match.awayTeam)}">
-        `;
-
-        const homeInput = row.querySelector(`#result-home-${match.id}`);
-        const awayInput = row.querySelector(`#result-away-${match.id}`);
-
-        [homeInput, awayInput].forEach((input) => {
-            input.addEventListener("change", () => saveResult(match));
-        });
-
-        fragment.appendChild(row);
-    });
-
-    els.adminResults.replaceChildren(fragment);
-}
-
 async function handleParticipantName() {
     const name = els.participantName.value.trim();
     if (!name || !state.db) return;
@@ -556,28 +527,76 @@ function showPreviewMessage(message) {
     els.savedPredictions.textContent = message;
 }
 
+function renderAdminResults() {
+    const finishedMatches = matches.filter((match) => match.status === "FINISHED");
+    const fragment = document.createDocumentFragment();
+
+    finishedMatches.forEach((match) => {
+        const row = document.createElement("div");
+        row.className = "admin-result-row";
+        
+        // CORREÇÃO: Estruturação dos inputs com IDs limpos e o botão de salvar individual
+        row.innerHTML = `
+            <div style="flex: 1;">
+                <strong>${flagInlineMarkup(match.homeTeam)} ${escapeHtml(match.homeTeam)} x ${escapeHtml(match.awayTeam)} ${flagInlineMarkup(match.awayTeam)}</strong>
+                <br><small style="color: var(--text-muted, #777);">${formatDateLabel(match.utcDate)} • ${formatTime(match.utcDate)}</small>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="number" min="0" inputmode="numeric" id="result-home-${match.id}" style="width: 55px; text-align: center; padding: 4px;" aria-label="Gols reais de ${escapeHtml(match.homeTeam)}">
+                <span>x</span>
+                <input type="number" min="0" inputmode="numeric" id="result-away-${match.id}" style="width: 55px; text-align: center; padding: 4px;" aria-label="Gols reais de ${escapeHtml(match.awayTeam)}">
+                <button type="button" class="save-button compact btn-save-manual" data-matchid="${match.id}" style="padding: 0.35rem 0.6rem; margin: 0 0 0 0.5rem; background-color: #007bff; cursor: pointer; border-radius: 4px;">Brl💾</button>
+            </div>
+        `;
+
+        // Vincula a gravação ao clique do botão, e não mais ao evento de digitação instável
+        const saveBtn = row.querySelector(".btn-save-manual");
+        saveBtn.addEventListener("click", () => saveResult(match));
+
+        fragment.appendChild(row);
+    });
+
+    els.adminResults.replaceChildren(fragment);
+}
+
+
+
 async function saveResult(match) {
     if (!state.db) return;
 
-    const homeGoals = toScore(document.getElementById(`result-home-${match.id}`).value);
-    const awayGoals = toScore(document.getElementById(`result-away-${match.id}`).value);
+    // Captura os elementos de input gerados dinamicamente na árvore DOM
+    const homeInputEl = document.getElementById(`result-home-${match.id}`);
+    const awayInputEl = document.getElementById(`result-away-${match.id}`);
 
-    if (homeGoals === null || awayGoals === null) return;
+    if (!homeInputEl || !awayInputEl) return;
+
+    const homeGoals = toScore(homeInputEl.value);
+    const awayGoals = toScore(awayInputEl.value);
+
+    // Validação de preenchimento obrigatório nos dois lados da partida
+    if (homeGoals === null || awayGoals === null) {
+        alert(`Aviso: Preencha os dois campos de placar para computar ${match.homeTeam} x ${match.awayTeam}`);
+        return;
+    }
 
     try {
+        setConnection("Salvando resultado oficial...");
+        
+        // Salva na coleção global unificada de resultados oficiais
         await setDoc(doc(collection(state.db, "resultados"), String(match.id)), {
             matchId: match.id,
-            homeGoals,
-            awayGoals,
+            homeGoals: Number(homeGoals),
+            awayGoals: Number(awayGoals),
             registradoEm: serverTimestamp()
         }, { merge: true });
 
+        // Executa o motor de recálculo de ranking isolado do grupo
         await recalculateRanking();
+        setConnection("✅ Resultado oficial computado!");
     } catch (error) {
         handleFirebaseError(error);
     }
 }
-
 // 1. Lembre-se de mapear o novo elemento de mensagem no objeto 'els' no topo do seu app.js:
 // els.syncMessage = document.getElementById("syncMessage");
 // els.btnSyncApi = document.getElementById("btnSyncApi");
