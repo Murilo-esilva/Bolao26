@@ -548,30 +548,30 @@ function updateSavedPreview(predictions) {
 function showPreviewMessage(message) {
     els.savedPredictions.textContent = message;
 }
-
 function renderAdminResults() {
-    const finishedMatches = matches.filter((match) => match.status === "FINISHED");
+    // Altera o filtro para exibir todos os jogos no painel administrativo
+    const finishedMatches = matches;
     const fragment = document.createDocumentFragment();
 
     finishedMatches.forEach((match) => {
         const row = document.createElement("div");
         row.className = "admin-result-row";
         
-        // CORREÇÃO: Estruturação dos inputs com IDs limpos e o botão de salvar individual
+        // CORREÇÃO CRÍTICA: Garante que os atributos 'id' estejam explicitamente injetados nos inputs
         row.innerHTML = `
-            <div style="flex: 1;">
+            <div style="flex: 1; margin-bottom: 0.5rem;">
                 <strong>${flagInlineMarkup(match.homeTeam)} ${escapeHtml(match.homeTeam)} x ${escapeHtml(match.awayTeam)} ${flagInlineMarkup(match.awayTeam)}</strong>
-                <br><small style="color: var(--text-muted, #777);">${formatDateLabel(match.utcDate)} • ${formatTime(match.utcDate)}</small>
+                <br><small style="color: var(--text-muted, #777);">${formatDateLabel(match.utcDate)} • ${formatTime(match.utcDate)} ${statusBadge(match.status)}</small>
             </div>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: flex-end;">
                 <input type="number" min="0" inputmode="numeric" id="result-home-${match.id}" style="width: 55px; text-align: center; padding: 4px;" aria-label="Gols reais de ${escapeHtml(match.homeTeam)}">
                 <span>x</span>
                 <input type="number" min="0" inputmode="numeric" id="result-away-${match.id}" style="width: 55px; text-align: center; padding: 4px;" aria-label="Gols reais de ${escapeHtml(match.awayTeam)}">
-                <button type="button" class="save-button compact btn-save-manual" data-matchid="${match.id}" style="padding: 0.35rem 0.6rem; margin: 0 0 0 0.5rem; background-color: #007bff; cursor: pointer; border-radius: 4px;">Brl💾</button>
+                <button type="button" class="save-button compact btn-save-manual" data-matchid="${match.id}" style="padding: 0.35rem 0.6rem; margin: 0 0 0 0.5rem; background-color: #007bff; cursor: pointer; border-radius: 4px; border: none; color: white;">💾</button>
             </div>
         `;
 
-        // Vincula a gravação ao clique do botão, e não mais ao evento de digitação instável
+        // Atribui o clique chamando a função de gravação
         const saveBtn = row.querySelector(".btn-save-manual");
         saveBtn.addEventListener("click", () => saveResult(match));
 
@@ -581,41 +581,48 @@ function renderAdminResults() {
     els.adminResults.replaceChildren(fragment);
 }
 
-
-
 async function saveResult(match) {
-    if (!state.db) return;
+    if (!state.db) {
+        alert("Erro: Banco de dados não conectado.");
+        return;
+    }
 
-    // Captura os elementos de input gerados dinamicamente na árvore DOM
+    // Captura os elementos pelos IDs garantidos na renderização acima
     const homeInputEl = document.getElementById(`result-home-${match.id}`);
     const awayInputEl = document.getElementById(`result-away-${match.id}`);
 
-    if (!homeInputEl || !awayInputEl) return;
+    if (!homeInputEl || !awayInputEl) {
+        alert("Erro técnico: Inputs não encontrados na árvore da página.");
+        return;
+    }
 
     const homeGoals = toScore(homeInputEl.value);
     const awayGoals = toScore(awayInputEl.value);
 
-    // Validação de preenchimento obrigatório nos dois lados da partida
+    // Validação: Impede o envio caso algum campo esteja vazio
     if (homeGoals === null || awayGoals === null) {
-        alert(`Aviso: Preencha os dois campos de placar para computar ${match.homeTeam} x ${match.awayTeam}`);
+        alert(`Aviso: Digite os gols de ambos os times para salvar o jogo ${match.homeTeam} x ${match.awayTeam}`);
         return;
     }
 
     try {
-        setConnection("Salvando resultado oficial...");
+        setConnection("Gravando resultado oficial...");
         
-        // Salva na coleção global unificada de resultados oficiais
+        // Salva na coleção unificada convertendo o ID em String para chave estável
         await setDoc(doc(collection(state.db, "resultados"), String(match.id)), {
-            matchId: match.id,
+            matchId: Number(match.id),
             homeGoals: Number(homeGoals),
             awayGoals: Number(awayGoals),
             registradoEm: serverTimestamp()
         }, { merge: true });
 
-        // Executa o motor de recálculo de ranking isolado do grupo
+        // Força o recálculo do ranking do grupo ativo
         await recalculateRanking();
-        setConnection("✅ Resultado oficial computado!");
+        
+        alert(`Sucesso: Jogo ${match.homeTeam} x ${match.awayTeam} atualizado!`);
+        setConnection("✅ Resultado oficial gravado!");
     } catch (error) {
+        console.error("Erro ao salvar no Firestore:", error);
         handleFirebaseError(error);
     }
 }
