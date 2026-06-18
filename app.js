@@ -1,15 +1,4 @@
-Esse erro de sintaxe (`',' expected` ou "esperava-se uma vírgula") no VS Code quase sempre acontece quando o JavaScript se perde na estrutura do código durante o "copia e cola".
-
-Geralmente, isso ocorre por dois motivos:
-
-1. As novas funções acabaram sendo coladas dentro de um objeto (como `const state = { ... }` ou `const els = { ... }`), onde o JavaScript exige vírgulas separando os itens, não declarações de função.
-2. Faltou (ou sobrou) uma chave `}` de fechamento em alguma função que estava logo acima do trecho modificado.
-
-Como o arquivo é grande e substituir pedaços específicos pode causar esses problemas de aninhamento, a forma mais segura de resolver isso é **substituir o arquivo inteiro**.
-
-Aqui está o código completo do seu `app.js` já com todas as implementações de isolamento de grupo, filtros do Firestore e a chave do grupo na URL devidamente integradas. Você pode copiar o bloco abaixo e substituir **todo** o conteúdo do seu `app.js` atual:
-
-```javascript
+javascript
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
     collection,
@@ -873,5 +862,3 @@ function friendlyFirebaseMessage(error) {
 
     return `Não foi possível salvar no Firestore. Detalhe: ${error?.message || "erro desconhecido"}`;
 }
-
-```
