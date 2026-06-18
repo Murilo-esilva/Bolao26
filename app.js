@@ -600,7 +600,7 @@ async function syncOfficialResults() {
     
     try {
         const response = await fetch("https://football-data.org", {
-            headers: { "X-Auth-Token": API_TOKEN }
+            headers: { "X-Auth-Token": 8c1fd129b7b4474694b6b29c8ea69aad }
         });
 
         if (!response.ok) throw new Error(`Status ${response.status}`);
