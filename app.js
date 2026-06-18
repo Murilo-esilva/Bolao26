@@ -596,7 +596,7 @@ async function syncOfficialResults() {
     syncMessage.textContent = "⏳ n8n filtrando placares oficiais...";
 
     // Substitua pela URL de produção ou teste do seu n8n
-    const N8N_WEBHOOK_URL = "https://seu-n8n.com"; 
+    const N8N_WEBHOOK_URL = "https://n8n-homol.unicoob.local/webhook/sincronizar-copa"; 
     
     try {
         const response = await fetch(N8N_WEBHOOK_URL, {
