@@ -26,6 +26,7 @@
 
         <nav class="tabs" aria-label="Navegação principal">
             <button class="tab-button active" type="button" data-tab="palpites">Palpites</button>
+            <button class="tab-button" type="button" data-tab="resultados">Resultados</button>
             <button class="tab-button" type="button" data-tab="ranking">Ranking</button>
         </nav>
     </header>
@@ -98,6 +99,20 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </section>
+
+        <section class="tab-panel" data-panel="resultados" id="resultados">
+            <div class="section-heading results-heading">
+                <div>
+                    <p class="eyebrow">Conferência</p>
+                    <h2>Resultados e palpites</h2>
+                </div>
+                <span class="results-count" id="resultsCount">0 palpites</span>
+            </div>
+
+            <div id="resultsBoard" class="results-board">
+                <div class="empty-results">Aguardando dados do Firestore.</div>
             </div>
         </section>
     </main>
