@@ -42,28 +42,28 @@ const matches = [
   {
     "id": 537403,
     "utcDate": "2026-06-17T17:00:00Z",
-    "status": "IN_PLAY",
+    "status": "FINISHED",
     "homeTeam": "Portugal",
     "awayTeam": "Congo DR"
   },
   {
     "id": 537409,
     "utcDate": "2026-06-17T20:00:00Z",
-    "status": "TIMED",
+    "status": "FINISHED",
     "homeTeam": "England",
     "awayTeam": "Croatia"
   },
   {
     "id": 537410,
     "utcDate": "2026-06-17T23:00:00Z",
-    "status": "TIMED",
+    "status": "FINISHED",
     "homeTeam": "Ghana",
     "awayTeam": "Panama"
   },
   {
     "id": 537404,
     "utcDate": "2026-06-18T02:00:00Z",
-    "status": "TIMED",
+    "status": "FINISHED",
     "homeTeam": "Uzbekistan",
     "awayTeam": "Colombia"
   },
