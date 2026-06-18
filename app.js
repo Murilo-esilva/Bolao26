@@ -42,7 +42,7 @@ const matches = [
   {
     "id": 537403,
     "utcDate": "2026-06-17T17:00:00Z",
-    "status": "IN_PLAY",
+    "status": "FINISHED",
     "homeTeam": "Portugal",
     "awayTeam": "Congo DR"
   },
@@ -356,9 +356,12 @@ const state = {
     participantId: "",
     participantName: "",
     unsubscribePredictions: null,
+    unsubscribeAllPredictions: null,
     unsubscribeRanking: null,
     unsubscribeParticipants: null,
     unsubscribeResults: null,
+    participants: [],
+    predictions: [],
     results: new Map()
 };
 
@@ -480,6 +483,8 @@ const els = {
     participantName: document.getElementById("participantName"),
     rankingBody: document.getElementById("rankingBody"),
     recalculateRanking: document.getElementById("recalculateRanking"),
+    resultsBoard: document.getElementById("resultsBoard"),
+    resultsCount: document.getElementById("resultsCount"),
     savedPredictions: document.getElementById("savedPredictions"),
     totalGames: document.getElementById("totalGames"),
     totalParticipants: document.getElementById("totalParticipants"),
@@ -506,6 +511,7 @@ function start() {
         setConnection("Firestore conectado");
         listenToRanking();
         listenToParticipants();
+        listenToAllPredictions();
         listenToResults();
     } catch (error) {
         console.error(error);
@@ -672,7 +678,25 @@ function listenToParticipants() {
     state.unsubscribeParticipants = onSnapshot(
         collection(state.db, "participantes"),
         (snapshot) => {
+            state.participants = snapshot.docs
+                .map((item) => ({ id: item.id, ...item.data() }))
+                .sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
             els.totalParticipants.textContent = String(snapshot.size);
+            renderResultsBoard();
+        },
+        handleFirebaseError
+    );
+}
+
+function listenToAllPredictions() {
+    if (!state.db) return;
+
+    state.unsubscribeAllPredictions = onSnapshot(
+        collection(state.db, "palpites"),
+        (snapshot) => {
+            state.predictions = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+            els.resultsCount.textContent = `${state.predictions.length} ${state.predictions.length === 1 ? "palpite" : "palpites"}`;
+            renderResultsBoard();
         },
         handleFirebaseError
     );
@@ -687,6 +711,7 @@ function listenToResults() {
             state.results = new Map(snapshot.docs.map((item) => [Number(item.data().matchId), item.data()]));
             els.totalResults.textContent = String(snapshot.size);
             fillAdminResults();
+            renderResultsBoard();
         },
         handleFirebaseError
     );
@@ -880,6 +905,121 @@ function renderRanking(ranking) {
             <td>${item.vencedores}</td>
         </tr>
     `).join("");
+}
+
+function renderResultsBoard() {
+    if (!els.resultsBoard) return;
+
+    const participants = state.participants;
+
+    if (!participants.length && !state.predictions.length) {
+        els.resultsBoard.innerHTML = `<div class="empty-results">Nenhum participante ou palpite salvo ainda.</div>`;
+        return;
+    }
+
+    const participantMap = new Map(participants.map((participant) => [participant.id, participant]));
+    const predictionsByMatch = groupPredictionsByMatch(state.predictions);
+
+    els.resultsBoard.innerHTML = matches.map((match) => {
+        const result = state.results.get(match.id);
+        const predictionsForMatch = predictionsByMatch.get(match.id) || new Map();
+        const status = result ? "Resultado oficial" : statusLabel(match.status);
+        const rows = buildPredictionRows(participants, participantMap, predictionsForMatch, result);
+
+        return `
+            <article class="result-card">
+                <header class="result-card-header">
+                    <div class="result-teams">
+                        ${flagInlineMarkup(match.homeTeam)}
+                        <strong>${escapeHtml(match.homeTeam)}</strong>
+                        <span>x</span>
+                        <strong>${escapeHtml(match.awayTeam)}</strong>
+                        ${flagInlineMarkup(match.awayTeam)}
+                    </div>
+                    <div class="result-score ${result ? "has-result" : ""}">
+                        ${result ? `${result.homeGoals} - ${result.awayGoals}` : "Aguardando"}
+                    </div>
+                    <span class="result-status">${status}</span>
+                </header>
+
+                <div class="result-meta">
+                    <span>${formatDateLabel(match.utcDate)}</span>
+                    <span>${formatTime(match.utcDate)}</span>
+                </div>
+
+                <div class="prediction-list">
+                    ${rows}
+                </div>
+            </article>
+        `;
+    }).join("");
+}
+
+function groupPredictionsByMatch(predictions) {
+    return predictions.reduce((grouped, prediction) => {
+        const matchId = Number(prediction.matchId);
+        const participantId = prediction.participanteId;
+
+        if (!grouped.has(matchId)) {
+            grouped.set(matchId, new Map());
+        }
+
+        grouped.get(matchId).set(participantId, prediction);
+        return grouped;
+    }, new Map());
+}
+
+function buildPredictionRows(participants, participantMap, predictionsForMatch, result) {
+    const participantIds = new Set([
+        ...participants.map((participant) => participant.id),
+        ...predictionsForMatch.keys()
+    ]);
+
+    if (!participantIds.size) {
+        return `<div class="prediction-row empty-row">Nenhum palpite para este jogo.</div>`;
+    }
+
+    return [...participantIds]
+        .map((participantId) => {
+            const participant = participantMap.get(participantId);
+            const prediction = predictionsForMatch.get(participantId);
+            const name = participant?.nome || prediction?.nome || participantId;
+            const score = prediction ? `${prediction.homeGoals} - ${prediction.awayGoals}` : "--";
+            const points = prediction && result ? scorePrediction(prediction, result) : null;
+
+            return `
+                <div class="prediction-row">
+                    <span class="prediction-name">${escapeHtml(name)}</span>
+                    <span class="prediction-detail">
+                        <span class="prediction-score">${score}</span>
+                        ${points === null ? "" : `<span class="prediction-points points-${points}">${points} pts</span>`}
+                    </span>
+                </div>
+            `;
+        })
+        .join("");
+}
+
+function scorePrediction(prediction, result) {
+    if (prediction.homeGoals === result.homeGoals && prediction.awayGoals === result.awayGoals) {
+        return 3;
+    }
+
+    if (outcome(prediction.homeGoals, prediction.awayGoals) === outcome(result.homeGoals, result.awayGoals)) {
+        return 1;
+    }
+
+    return 0;
+}
+
+function statusLabel(status) {
+    const labels = {
+        FINISHED: "Encerrado",
+        IN_PLAY: "Ao vivo",
+        TIMED: "Aguardando"
+    };
+
+    return labels[status] || status;
 }
 
 function unlockAdmin() {
