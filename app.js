@@ -469,12 +469,12 @@ function bindEvents() {
         button.addEventListener("click", () => activateTab(button.dataset.tab));
     });
 
-    els.participantName.addEventListener("change", handleParticipantName);
-    els.participantName.addEventListener("blur", handleParticipantName);
+    els.participantName.addEventListener("change", () => handleParticipantName().catch(handleFirebaseError));
+    els.participantName.addEventListener("blur", () => handleParticipantName().catch(handleFirebaseError));
     els.bolaoForm.addEventListener("submit", savePredictions);
     els.adminOpen.addEventListener("click", () => els.adminDialog.showModal());
     els.adminUnlock.addEventListener("click", unlockAdmin);
-    els.recalculateRanking.addEventListener("click", recalculateRanking);
+    els.recalculateRanking.addEventListener("click", () => recalculateRanking().catch(handleFirebaseError));
 }
 
 function activateTab(tab) {
@@ -588,45 +588,62 @@ function listenToCurrentPredictions() {
         where("participanteId", "==", state.participantId)
     );
 
-    state.unsubscribePredictions = onSnapshot(predictionsQuery, (snapshot) => {
-        const predictions = snapshot.docs.map((item) => item.data());
-        fillPredictions(predictions);
-        updateSavedPreview(predictions);
-    });
+    state.unsubscribePredictions = onSnapshot(
+        predictionsQuery,
+        (snapshot) => {
+            const predictions = snapshot.docs.map((item) => item.data());
+            fillPredictions(predictions);
+            updateSavedPreview(predictions);
+        },
+        handleFirebaseError
+    );
 }
 
 function listenToRanking() {
     if (!state.db) return;
 
-    state.unsubscribeRanking = onSnapshot(collection(state.db, "ranking"), (snapshot) => {
-        const ranking = snapshot.docs
-            .map((item) => item.data())
-            .sort((a, b) => b.pontos - a.pontos || b.exatos - a.exatos || a.nome.localeCompare(b.nome));
+    state.unsubscribeRanking = onSnapshot(
+        collection(state.db, "ranking"),
+        (snapshot) => {
+            const ranking = snapshot.docs
+                .map((item) => item.data())
+                .sort((a, b) => b.pontos - a.pontos || b.exatos - a.exatos || a.nome.localeCompare(b.nome));
 
-        renderRanking(ranking);
-    });
+            renderRanking(ranking);
+        },
+        handleFirebaseError
+    );
 }
 
 function listenToParticipants() {
     if (!state.db) return;
 
-    state.unsubscribeParticipants = onSnapshot(collection(state.db, "participantes"), (snapshot) => {
-        els.totalParticipants.textContent = String(snapshot.size);
-    });
+    state.unsubscribeParticipants = onSnapshot(
+        collection(state.db, "participantes"),
+        (snapshot) => {
+            els.totalParticipants.textContent = String(snapshot.size);
+        },
+        handleFirebaseError
+    );
 }
 
 function listenToResults() {
     if (!state.db) return;
 
-    state.unsubscribeResults = onSnapshot(collection(state.db, "resultados"), (snapshot) => {
-        state.results = new Map(snapshot.docs.map((item) => [Number(item.data().matchId), item.data()]));
-        els.totalResults.textContent = String(snapshot.size);
-        fillAdminResults();
-    });
+    state.unsubscribeResults = onSnapshot(
+        collection(state.db, "resultados"),
+        (snapshot) => {
+            state.results = new Map(snapshot.docs.map((item) => [Number(item.data().matchId), item.data()]));
+            els.totalResults.textContent = String(snapshot.size);
+            fillAdminResults();
+        },
+        handleFirebaseError
+    );
 }
 
 async function savePredictions(event) {
     event.preventDefault();
+    const submitButton = els.bolaoForm.querySelector("button[type='submit']");
 
     if (!state.db) {
         showPreviewMessage("Configure o Firebase no topo do app.js antes de salvar.");
@@ -639,23 +656,40 @@ async function savePredictions(event) {
         return;
     }
 
-    await handleParticipantName();
+    submitButton.disabled = true;
+    submitButton.textContent = "Salvando...";
 
-    const predictions = collectPredictions();
-    const batch = writeBatch(state.db);
+    try {
+        await handleParticipantName();
 
-    predictions.forEach((prediction) => {
-        const predictionRef = doc(collection(state.db, "palpites"), `${state.participantId}_${prediction.matchId}`);
-        batch.set(predictionRef, {
-            ...prediction,
-            participanteId: state.participantId,
-            savedAt: serverTimestamp()
-        }, { merge: true });
-    });
+        const predictions = collectPredictions();
 
-    await batch.commit();
-    updateSavedPreview(predictions);
-    setConnection("Palpites salvos");
+        if (!predictions.length) {
+            showPreviewMessage("Preencha pelo menos um placar antes de salvar.");
+            setConnection("Nada para salvar");
+            return;
+        }
+
+        const batch = writeBatch(state.db);
+
+        predictions.forEach((prediction) => {
+            const predictionRef = doc(collection(state.db, "palpites"), `${state.participantId}_${prediction.matchId}`);
+            batch.set(predictionRef, {
+                ...prediction,
+                participanteId: state.participantId,
+                savedAt: serverTimestamp()
+            }, { merge: true });
+        });
+
+        await batch.commit();
+        updateSavedPreview(predictions);
+        setConnection("Palpites salvos");
+    } catch (error) {
+        handleFirebaseError(error);
+    } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = `<span aria-hidden="true">↗</span> Salvar palpites`;
+    }
 }
 
 function collectPredictions() {
@@ -712,14 +746,18 @@ async function saveResult(match) {
 
     if (homeGoals === null || awayGoals === null) return;
 
-    await setDoc(doc(collection(state.db, "resultados"), String(match.id)), {
-        matchId: match.id,
-        homeGoals,
-        awayGoals,
-        registradoEm: serverTimestamp()
-    }, { merge: true });
+    try {
+        await setDoc(doc(collection(state.db, "resultados"), String(match.id)), {
+            matchId: match.id,
+            homeGoals,
+            awayGoals,
+            registradoEm: serverTimestamp()
+        }, { merge: true });
 
-    await recalculateRanking();
+        await recalculateRanking();
+    } catch (error) {
+        handleFirebaseError(error);
+    }
 }
 
 async function recalculateRanking() {
@@ -884,4 +922,30 @@ function setConnection(text) {
 
 function hideLoading() {
     els.loadingOverlay.classList.add("hidden");
+}
+
+function handleFirebaseError(error) {
+    console.error(error);
+
+    const message = friendlyFirebaseMessage(error);
+    setConnection("Erro no Firestore");
+    showPreviewMessage(message);
+}
+
+function friendlyFirebaseMessage(error) {
+    const code = error?.code || "";
+
+    if (code.includes("permission-denied")) {
+        return "O Firestore recusou a gravação. Publique as regras de desenvolvimento no Firebase Console e tente novamente.";
+    }
+
+    if (code.includes("unavailable") || code.includes("deadline-exceeded")) {
+        return "Não foi possível conectar ao Firestore agora. Verifique a conexão e tente novamente.";
+    }
+
+    if (code.includes("failed-precondition")) {
+        return "O Firestore pediu uma configuração adicional. Confira o console do navegador para ver o detalhe.";
+    }
+
+    return `Não foi possível salvar no Firestore. Detalhe: ${error?.message || "erro desconhecido"}`;
 }
