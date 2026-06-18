@@ -660,40 +660,72 @@ async function syncOfficialResults() {
 
 
 async function recalculateRanking() {
-    if (!state.db) return;
+    if (!state.db || !state.groupId) return;
 
-    const [participantsSnapshot, predictionsSnapshot, resultsSnapshot] = await Promise.all([
-        getDocs(collection(state.db, "participantes")),
-        getDocs(collection(state.db, "palpites")),
-        getDocs(collection(state.db, "resultados"))
-    ]);
-
-    const participants = participantsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-    const predictions = predictionsSnapshot.docs.map((item) => item.data());
-    const results = new Map(resultsSnapshot.docs.map((item) => [Number(item.data().matchId), item.data()]));
-    const batch = writeBatch(state.db);
-
-    participants.forEach((participant) => {
-        const score = scoreParticipant(
-            predictions.filter((prediction) => prediction.participanteId === participant.id),
-            results
+    try {
+        const participantsQuery = query(
+            collection(state.db, "participantes"),
+            where("groupId", "==", state.groupId)
         );
 
-        batch.set(doc(collection(state.db, "ranking"), participant.id), {
-            participanteId: participant.id,
-            nome: participant.nome,
-            groupId: participant.groupId || state.groupId, // Chave do grupo adicionada
-            pontos: score.pontos,
-            exatos: score.exatos,
-            vencedores: score.vencedores,
-            atualizadoEm: serverTimestamp()
-        }, { merge: true });
-    });
+        const predictionsQuery = query(
+            collection(state.db, "palpites"),
+            where("groupId", "==", state.groupId)
+        );
 
-    await batch.commit();
-    setConnection("Ranking recalculado");
+        const [participantsSnapshot, predictionsSnapshot, resultsSnapshot] =
+            await Promise.all([
+                getDocs(participantsQuery),
+                getDocs(predictionsQuery),
+                getDocs(collection(state.db, "resultados"))
+            ]);
+
+        const participants = participantsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+
+        const predictions = predictionsSnapshot.docs.map(doc => doc.data());
+
+        const results = new Map(
+            resultsSnapshot.docs.map(doc => [
+                Number(doc.data().matchId),
+                doc.data()
+            ])
+        );
+
+        const batch = writeBatch(state.db);
+
+        participants.forEach((participant) => {
+            const score = scoreParticipant(
+                predictions.filter(
+                    prediction =>
+                        prediction.participanteId === participant.id
+                ),
+                results
+            );
+
+            batch.set(
+                doc(collection(state.db, "ranking"), participant.id),
+                {
+                    participanteId: participant.id,
+                    nome: participant.nome,
+                    groupId: participant.groupId || state.groupId,
+                    pontos: score.pontos,
+                    exatos: score.exatos,
+                    vencedores: score.vencedores,
+                    atualizadoEm: serverTimestamp()
+                },
+                { merge: true }
+            );
+        });
+
+        await batch.commit();
+        setConnection("Ranking recalculado");
+    } catch (error) {
+        handleFirebaseError(error);
+    }
 }
-
 function scoreParticipant(predictions, results) {
     return predictions.reduce((total, prediction) => {
         const result = results.get(Number(prediction.matchId));
