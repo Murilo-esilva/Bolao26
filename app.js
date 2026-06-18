@@ -305,34 +305,41 @@ function renderGames() {
             fragment.appendChild(divider);
         }
 
+        // ➕ NOVO: Busca se já existe resultado oficial para pintar o card de palpites
+        const oficialResult = state.results ? state.results.get(Number(match.id)) : null;
+        const cardClass = oficialResult ? "game-card oficial-verificado" : "game-card";
+        const cardStyle = oficialResult ? "border: 1px solid #28a745; background-color: #f4fbf6;" : "";
+
         const card = document.createElement("article");
-        card.className = "game-card";
+        card.className = cardClass;
+        if (cardStyle) card.setAttribute("style", cardStyle);
         card.style.animationDelay = `${Math.min(index * 24, 420)}ms`;
+        
         card.innerHTML = `
             <div class="match-meta">
                 <span class="match-time">${formatTime(match.utcDate)}</span>
-                ${statusBadge(match.status)}
+                ${oficialResult ? `<span class="status-badge finished" style="background-color: #28a745;">✓ OFICIAL</span>` : statusBadge(match.status)}
             </div>
             <div class="team home">
                 ${flagMarkup(match.homeTeam)}
                 <span class="team-name">${escapeHtml(match.homeTeam)}</span>
             </div>
-            <div class="score-input" aria-label="Palpite ${escapeHtml(match.homeTeam)} contra ${escapeHtml(match.awayTeam)}">
-                <input type="number" min="0" inputmode="numeric" id="home-${match.id}" aria-label="Gols de ${escapeHtml(match.homeTeam)}" ${match.status === "FINISHED" ? "disabled" : ""}>
+            <div class="score-input">
+                <input type="number" min="0" inputmode="numeric" id="home-${match.id}" value="${oficialResult ? oficialResult.homeGoals : ""}" ${match.status === "FINISHED" || oficialResult ? "disabled" : ""}>
                 <span>X</span>
-                <input type="number" min="0" inputmode="numeric" id="away-${match.id}" aria-label="Gols de ${escapeHtml(match.awayTeam)}" ${match.status === "FINISHED" ? "disabled" : ""}>
+                <input type="number" min="0" inputmode="numeric" id="away-${match.id}" value="${oficialResult ? oficialResult.awayGoals : ""}" ${match.status === "FINISHED" || oficialResult ? "disabled" : ""}>
             </div>
             <div class="team away">
                 <span class="team-name">${escapeHtml(match.awayTeam)}</span>
                 ${flagMarkup(match.awayTeam)}
             </div>
+            ${oficialResult ? `<div style="text-align: center; grid-column: span 5; font-size: 0.8rem; color: #28a745; font-weight: bold; margin-top: 4px;">Placar Oficial Confirmado no Banco</div>` : ""}
         `;
         fragment.appendChild(card);
     });
 
     els.gamesContainer.replaceChildren(fragment);
 }
-
 async function handleParticipantName() {
     const name = els.participantName.value.trim();
     if (!name || !state.db) return;
