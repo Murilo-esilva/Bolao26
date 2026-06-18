@@ -42,28 +42,28 @@ const matches = [
   {
     "id": 537403,
     "utcDate": "2026-06-17T17:00:00Z",
-    "status": "FINISHED",
+    "status": "IN_PLAY",
     "homeTeam": "Portugal",
     "awayTeam": "Congo DR"
   },
   {
     "id": 537409,
     "utcDate": "2026-06-17T20:00:00Z",
-    "status": "FINISHED",
+    "status": "TIMED",
     "homeTeam": "England",
     "awayTeam": "Croatia"
   },
   {
     "id": 537410,
     "utcDate": "2026-06-17T23:00:00Z",
-    "status": "FINISHED",
+    "status": "TIMED",
     "homeTeam": "Ghana",
     "awayTeam": "Panama"
   },
   {
     "id": 537404,
     "utcDate": "2026-06-18T02:00:00Z",
-    "status": "FINISHED",
+    "status": "TIMED",
     "homeTeam": "Uzbekistan",
     "awayTeam": "Colombia"
   },
@@ -413,6 +413,57 @@ const flags = {
     "Uzbekistan": "🇺🇿"
 };
 
+const flagCodes = {
+    "Algeria": "dz",
+    "Argentina": "ar",
+    "Australia": "au",
+    "Austria": "at",
+    "Belgium": "be",
+    "Bosnia-Herzegovina": "ba",
+    "Brazil": "br",
+    "Canada": "ca",
+    "Cape Verde Islands": "cv",
+    "Colombia": "co",
+    "Congo DR": "cd",
+    "Croatia": "hr",
+    "Curaçao": "cw",
+    "Czechia": "cz",
+    "Ecuador": "ec",
+    "Egypt": "eg",
+    "England": "gb-eng",
+    "France": "fr",
+    "Germany": "de",
+    "Ghana": "gh",
+    "Haiti": "ht",
+    "Iran": "ir",
+    "Iraq": "iq",
+    "Ivory Coast": "ci",
+    "Japan": "jp",
+    "Jordan": "jo",
+    "Mexico": "mx",
+    "Morocco": "ma",
+    "Netherlands": "nl",
+    "New Zealand": "nz",
+    "Norway": "no",
+    "Panama": "pa",
+    "Paraguay": "py",
+    "Portugal": "pt",
+    "Qatar": "qa",
+    "Saudi Arabia": "sa",
+    "Scotland": "gb-sct",
+    "Senegal": "sn",
+    "South Africa": "za",
+    "South Korea": "kr",
+    "Spain": "es",
+    "Sweden": "se",
+    "Switzerland": "ch",
+    "Tunisia": "tn",
+    "Turkey": "tr",
+    "United States": "us",
+    "Uruguay": "uy",
+    "Uzbekistan": "uz"
+};
+
 const els = {
     adminDialog: document.getElementById("adminDialog"),
     adminLogin: document.getElementById("adminLogin"),
@@ -511,7 +562,7 @@ function renderGames() {
                 ${statusBadge(match.status)}
             </div>
             <div class="team home">
-                <span class="flag" aria-hidden="true">${flags[match.homeTeam] || "🏳"}</span>
+                ${flagMarkup(match.homeTeam)}
                 <span class="team-name">${escapeHtml(match.homeTeam)}</span>
             </div>
             <div class="score-input" aria-label="Palpite ${escapeHtml(match.homeTeam)} contra ${escapeHtml(match.awayTeam)}">
@@ -521,7 +572,7 @@ function renderGames() {
             </div>
             <div class="team away">
                 <span class="team-name">${escapeHtml(match.awayTeam)}</span>
-                <span class="flag" aria-hidden="true">${flags[match.awayTeam] || "🏳"}</span>
+                ${flagMarkup(match.awayTeam)}
             </div>
         `;
         fragment.appendChild(card);
@@ -539,7 +590,7 @@ function renderAdminResults() {
         row.className = "admin-result-row";
         row.innerHTML = `
             <div>
-                <strong>${flags[match.homeTeam] || "🏳"} ${escapeHtml(match.homeTeam)} x ${escapeHtml(match.awayTeam)} ${flags[match.awayTeam] || "🏳"}</strong>
+                <strong>${flagInlineMarkup(match.homeTeam)} ${escapeHtml(match.homeTeam)} x ${escapeHtml(match.awayTeam)} ${flagInlineMarkup(match.awayTeam)}</strong>
                 <span>${formatDateLabel(match.utcDate)} • ${formatTime(match.utcDate)}</span>
             </div>
             <input type="number" min="0" inputmode="numeric" id="result-home-${match.id}" aria-label="Gols reais de ${escapeHtml(match.homeTeam)}">
@@ -850,6 +901,36 @@ function fillAdminResults() {
         if (home) home.value = result.homeGoals;
         if (away) away.value = result.awayGoals;
     });
+}
+
+function flagMarkup(teamName) {
+    const code = flagCodes[teamName];
+
+    if (!code) {
+        return `<span class="flag flag-fallback" aria-hidden="true">?</span>`;
+    }
+
+    return `
+        <img
+            class="flag"
+            src="https://flagcdn.com/w80/${code}.png"
+            srcset="https://flagcdn.com/w160/${code}.png 2x"
+            width="40"
+            height="30"
+            alt="Bandeira de ${escapeHtml(teamName)}"
+            loading="lazy"
+        >
+    `;
+}
+
+function flagInlineMarkup(teamName) {
+    const code = flagCodes[teamName];
+
+    if (!code) {
+        return `<span class="flag-inline" aria-hidden="true">?</span>`;
+    }
+
+    return `<img class="flag-inline" src="https://flagcdn.com/w40/${code}.png" width="24" height="18" alt="Bandeira de ${escapeHtml(teamName)}" loading="lazy">`;
 }
 
 function statusBadge(status) {
