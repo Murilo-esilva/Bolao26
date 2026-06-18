@@ -908,21 +908,46 @@ async function recalculateRanking() {
 function scoreParticipant(predictions, results) {
     return predictions.reduce((total, prediction) => {
         const result = results.get(Number(prediction.matchId));
-        if (!result) return total;
 
-        if (prediction.homeGoals === result.homeGoals && prediction.awayGoals === result.awayGoals) {
+        console.log("PALPITE:", prediction);
+        console.log("RESULTADO:", result);
+
+        if (!result) {
+            console.log("Resultado não encontrado");
+            return total;
+        }
+
+        if (
+            prediction.homeGoals === result.homeGoals &&
+            prediction.awayGoals === result.awayGoals
+        ) {
+            console.log("PLACAR EXATO");
             total.pontos += 3;
             total.exatos += 1;
             return total;
         }
 
-        if (outcome(prediction.homeGoals, prediction.awayGoals) === outcome(result.homeGoals, result.awayGoals)) {
+        console.log(
+            "OUTCOMES:",
+            outcome(prediction.homeGoals, prediction.awayGoals),
+            outcome(result.homeGoals, result.awayGoals)
+        );
+
+        if (
+            outcome(prediction.homeGoals, prediction.awayGoals) ===
+            outcome(result.homeGoals, result.awayGoals)
+        ) {
+            console.log("ACERTOU VENCEDOR");
             total.pontos += 1;
             total.vencedores += 1;
         }
 
         return total;
-    }, { pontos: 0, exatos: 0, vencedores: 0 });
+    }, {
+        pontos: 0,
+        exatos: 0,
+        vencedores: 0
+    });
 }
 
 function renderRanking(ranking) {
