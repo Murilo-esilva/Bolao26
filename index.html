@@ -15,6 +15,36 @@
         <span>Conectando ao placar...</span>
     </div>
 
+    <!-- Modal de seleção/criação de grupo -->
+    <dialog id="groupDialog" class="group-dialog">
+        <div class="group-dialog-inner">
+            <div class="group-dialog-header">
+                <span class="brand-mark">26</span>
+                <div>
+                    <p class="eyebrow">Bolão da Copa 2026</p>
+                    <h2>Escolha seu grupo</h2>
+                </div>
+            </div>
+
+            <div class="group-create">
+                <label for="newGroupName">Criar novo grupo</label>
+                <div class="group-create-row">
+                    <input id="newGroupName" type="text" placeholder="Ex: Trabalho, Família, Amigos..." autocomplete="off" maxlength="60">
+                    <button id="createGroupBtn" class="save-button compact" type="button">Criar</button>
+                </div>
+                <p class="form-message" id="groupCreateMessage"></p>
+            </div>
+
+            <div class="group-divider">
+                <span>ou entre em um grupo existente</span>
+            </div>
+
+            <div id="groupList" class="group-list">
+                <div class="group-list-empty">Carregando grupos...</div>
+            </div>
+        </div>
+    </dialog>
+
     <header class="app-header">
         <a class="brand" href="#palpites" aria-label="Bolão da Copa 2026">
             <span class="brand-mark">26</span>
@@ -54,9 +84,18 @@
         </section>
 
         <section class="participant-panel" id="palpites">
-            <label for="participantName">Participante</label>
-            <div class="participant-row">
-                <input id="participantName" name="participantName" type="text" autocomplete="name" placeholder="Digite seu nome para salvar seus palpites">
+            <div class="group-banner">
+                <div class="group-banner-info">
+                    <span class="eyebrow" style="margin:0">Grupo ativo</span>
+                    <strong id="activeGroupName">—</strong>
+                </div>
+                <button id="changeGroupBtn" class="change-group-btn" type="button">Trocar grupo</button>
+            </div>
+            <div class="participant-grid">
+                <div>
+                    <label for="participantName">Participante</label>
+                    <input id="participantName" name="participantName" type="text" autocomplete="name" placeholder="Digite seu nome">
+                </div>
                 <span class="connection-pill" id="connectionStatus">Firestore pendente</span>
             </div>
         </section>
