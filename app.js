@@ -548,7 +548,7 @@ async function savePredictions(event) {
     }
 }
 
-function collectPredictions() {
+
 function collectPredictions() {
     return matches
         .filter((match) => {
