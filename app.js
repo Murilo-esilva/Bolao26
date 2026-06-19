@@ -334,7 +334,12 @@ function renderGames() {
         card.className = cardClass;
         if (cardStyle) card.setAttribute("style", cardStyle);
         card.style.animationDelay = `${Math.min(index * 24, 420)}ms`;
-        
+        const kickoffPassed = new Date(match.utcDate).getTime() <= Date.now();
+
+    const locked =
+        match.status === "FINISHED" ||
+        oficialResult ||
+        kickoffPassed;
         card.innerHTML = `
             <div class="match-meta">
                 <span class="match-time">${formatTime(match.utcDate)}</span>
@@ -345,9 +350,15 @@ function renderGames() {
                 <span class="team-name">${escapeHtml(match.homeTeam)}</span>
             </div>
             <div class="score-input">
-                <input type="number" min="0" inputmode="numeric" id="home-${match.id}" value="${oficialResult ? oficialResult.homeGoals : ""}" ${match.status === "FINISHED" || oficialResult ? "disabled" : ""}>
+            <input type="number" min="0" inputmode="numeric"
+                id="home-${match.id}"
+                value="${oficialResult ? oficialResult.homeGoals : ""}"
+                ${locked ? "disabled" : ""}>
                 <span>X</span>
-                <input type="number" min="0" inputmode="numeric" id="away-${match.id}" value="${oficialResult ? oficialResult.awayGoals : ""}" ${match.status === "FINISHED" || oficialResult ? "disabled" : ""}>
+            <input type="number" min="0" inputmode="numeric"
+                id="away-${match.id}"
+                value="${oficialResult ? oficialResult.awayGoals : ""}"
+                ${locked ? "disabled" : ""}>
             </div>
             <div class="team away">
                 <span class="team-name">${escapeHtml(match.awayTeam)}</span>
@@ -538,8 +549,15 @@ async function savePredictions(event) {
 }
 
 function collectPredictions() {
+function collectPredictions() {
     return matches
-        .filter((match) => match.status !== "FINISHED")
+        .filter((match) => {
+            const kickoffPassed =
+                new Date(match.utcDate).getTime() <= Date.now();
+
+            return !kickoffPassed &&
+                   match.status !== "FINISHED";
+        })
         .map((match) => ({
             matchId: match.id,
             homeTeam: match.homeTeam,
